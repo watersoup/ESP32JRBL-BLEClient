@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blinds Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <h1 id="controlTitle">Blinds-name</h1>
+
+    <div class="control-container">
+        <button id="toggleButton" > Open </button>
+    </div>
+    <p>
+        <button id="momentaryButton">Set Window Limits</button>
+    </p>
+    <p>
+    <div class="slider-container">
+        <label for="openRangeSlider">Open</label>
+        <input type="range" id="openRangeSlider" min="0" max="100" step="1" value="100">
+        <p>close</p>
+    </div>
+    </p>
+
+    <!-- Bottom status message element -->
+    <div id="statusMessage"></div>
+
+    <script src="scriptnew.js"></script>
+</body>
+
+</html>
