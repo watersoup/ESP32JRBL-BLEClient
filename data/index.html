@@ -1,31 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" >
 
-<head>
+<head >
     <meta charset="UTF-8">
     <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blinds Control</title>
     <link rel="stylesheet" href="style.css">
+
 </head>
 
-<body>
+<body >
 
     <h1 id="controlTitle">Blinds-name</h1>
 
     <div class="control-container">
-        <button id="toggleButton" > Open </button>
+        <!-- Toggle Button Container -->
+        <div class="toggleButton-container">
+            <button id="toggleButton">Open</button>
+        </div>
+
+        <!-- Momentary Button Container -->
+        <div class="momentaryButton-container">
+            <button id="momentaryButton">Set Window Limits</button>
+        </div>
+
+        <!-- Slider Container -->
+        <div class="slider-container">
+            <!-- Vertical slider -->
+            <input type="range" min="0" max="100" value="0" id="openRangeSlider">
+            <!-- Slider labels -->
+            <div class="label-container">
+                <div class="labelopen">Open</div>
+                <div class="labelclose">Closed</div>
+            </div>
+        </div>
     </div>
-    <p>
-        <button id="momentaryButton">Set Window Limits</button>
-    </p>
-    <p>
-    <div class="slider-container">
-        <label for="openRangeSlider">Open</label>
-        <input type="range" id="openRangeSlider" min="0" max="100" step="1" value="100">
-        <p>close</p>
-    </div>
-    </p>
 
     <!-- Bottom status message element -->
     <div id="statusMessage"></div>

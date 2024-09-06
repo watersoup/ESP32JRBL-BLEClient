@@ -3,7 +3,8 @@ const BlindsModule = (function () {
      // Private variables
     let blindName = "";
     let blindOpenFlag = 0; // 0 - closed/closing  1 - open/opening
-    let limitSetupFlag = 0; 
+    let limitSetupFlag = 3;
+    let previousValue = 0;
     let initializationFlag = 0;
 
 
@@ -174,8 +175,19 @@ const BlindsModule = (function () {
         return blindName;
     }
 
+    function updateSliderBackground(slidervalue) {
+      const percentage = slidervalue + "%";
+      const Slider = document.getElementById("openRangeSlider");
+      // Adjust the track background dynamically: light above the thumb, dark below
+      displayStatusMessage("sliderValue :" + percentage);
+      Slider.style.background = `linear-gradient(to right, #e4e6dc ${slidervalue}%, #20201f ${slidervalue}%)`;
+    }
+
     // Function to send slider values over WebSocket
     function wsUpdateOpenRange(value) {
+
+      const Slider = document.getElementById("openRangeSlider");
+
       // Create a JSON object with the slider value
       if (limitSetupFlag == 3){
         const data = {
@@ -183,21 +195,31 @@ const BlindsModule = (function () {
         };
         // Convert the JSON object to a string
         const requestData = JSON.stringify(data);
+        
 
         // Check if the WebSocket connection is open before sending
         if (socket.readyState === WebSocket.OPEN) {
+          updateSliderBackground(Slider.value);
+
           // Send the slider value to the server via WebSocket
+
           socket.send(requestData);
         } else {
           console.error('WebSocket connection is not open.');
         }
-      } else {
-        alert("Windows limits have to be set first (both) !" + BlindsModule.limitSetupFlag);
-        const openRangeSlider = document.getElementById("openRangeSlider");
+      } 
+      else {
+        alert("(2)Windows limits have to be set first (both) !" + BlindsModule.limitSetupFlag);
         if (blindOpenFlag ==1){
-          openRangeSlider.value =0 
-        } else{
-          openRangeSlider.value = 100
+          Slider.value =0 
+          updateSliderBackground(Slider.value);
+        } else if (blindOpenFlag == 2){
+          Slider.value = 100
+          updateSliderBackground(Slider.value);
+        } else {
+          // do nothing;
+          Slider.event.preventDefault();
+          return;
         }
       }
     }
@@ -220,7 +242,7 @@ const BlindsModule = (function () {
     // Function to display status messages at the bottom
     function displayStatusMessage(message) { //GOOD
         var statusMessageElement = document.getElementById("statusMessage");
-        // statusMessageElement.textContent = message;
+        statusMessageElement.textContent = message;
         console.log(message);
         // Clear the status message after a certain time (e.g., 5 seconds)
         setTimeout(function() {
@@ -298,7 +320,8 @@ const BlindsModule = (function () {
         wsUpdateOpenRange,
         wsSendMomentaryToggle,
         wsToggleBlinds,
-        factoryResetFromURL
+        factoryResetFromURL,
+        limitSetupFlag
       // Add other public functions...
     };
   })();
@@ -324,18 +347,24 @@ const UIModule = (function () {
     
     // Function to handle open range slider change
     function handleOpenRangeSliderChange() {
-        const openRangeSlider = document.getElementById("openRangeSlider");
-        openRangeSlider.addEventListener("input", (event) => {
+        const Slider = document.getElementById("openRangeSlider");
+        previousValue = Slider.value;
+        console.log( "slider moved:" + previousValue);
+        Slider.addEventListener("input", (event) => {
           if (BlindsModule.limitSetupFlag <3) {
-            alert("Windows limits have to be set first !" + BlindsModule.limitSetupFlag);
+            alert("(1)Windows limits have to be set first !:" + BlindsModule.limitSetupFlag);
             // Prevent the wsUpdateOpenRange function from being called
-            event.preventDefault();
+            // event.preventDefault();
+            Slider.value = previousValue;
+            // Optionally, update the background or appearance based on the value
+            updateSliderBackground(Slider.value);
             return;
+          } else{
+            previousValue = Slider.value;
+            BlindsModule.wsUpdateOpenRange(Slider.value);
           }
-          BlindsModule.wsUpdateOpenRange(openRangeSlider.value);
         });
     }
-
 
     return {
         handleMomentaryButtonClick,
@@ -348,9 +377,6 @@ const UIModule = (function () {
   
   // Usage of the modules
   window.addEventListener('DOMContentLoaded', () => {
-    
- 
-
       BlindsModule.firstLoad();
       // Other UI interactions...
       UIModule.handleToggleButton();

@@ -8,6 +8,7 @@
 #include <ElegantOTA.h>
 #include <LittleFSsupport.h>
 #include "wifiData.h"
+#include "motorObj.h"
 
 #define DEBUG 1
 #define  SHORT_PRESS_TIME 500
@@ -22,6 +23,7 @@ AsyncWebSocket ws("/ws");
 AsyncWiFiManager *wifiManager = new AsyncWiFiManager(&server, &dnsServer);
 
 unsigned long ota_progress_millis = 0;
+unsigned long wifiStartMillis = 0;
 int BUILTINPIN = 8;
 const int onOffButton = 20;
 const int intensityButton = 21;
@@ -35,6 +37,11 @@ int count =0;
 bleClientObj *bleInst=nullptr;
 std::string g_rxValue;
 String g_txValue;
+
+// create a motor object with 1 Servo;
+motorObj *mymotor;
+int directions[] = {1,1,1};
+
 
 void blink(const int PIN, int times=1, long int freq=500){
   for(int i = 0; i < times; i++){
@@ -50,6 +57,37 @@ void notifyError(String message){
 void notifyError(AsyncWebSocketClient *client, String  message){
   client->text("LOG : "+message);
 }
+
+bool turnOnWiFi(){
+  Serial.println("turning Wifi On ...");
+  WiFi.mode(WIFI_STA);              // Set Wi-Fi mode to Station (client)
+  WiFi.begin();                     // Begin reconnecting to the last saved AP
+  
+  // Wait until Wi-Fi is connected or timeout after 10 seconds
+  unsigned long startTime = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+      delay(500);
+      Serial.print(".");
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nWi-Fi connected!");
+      Serial.println(WiFi.localIP());  // Print the local IP
+  } else {
+      Serial.println("\nFailed to reconnect to Wi-Fi.");
+      return false;
+  }
+  return true;
+}
+bool turnOffWiFi(){
+  Serial.println("turning Wifi off....");
+  ;   // Disconnect Wi-Fi and remove saved credentials
+  if (WiFi.disconnect(true) && WiFi.mode(WIFI_OFF)) {
+    return true;
+  }     // Turn off the Wi-Fi radio
+  return false;
+}
+
 void onOTAStart() {
   // Log when OTA has started
   Serial.println("OTA update started!");
@@ -70,11 +108,10 @@ void handleIntensityButtonPress() {
 
     if (digitalRead(intensityButton) == HIGH) {
         pressedTime = millis();
-        // attachAll();
+        mymotor->attachAll();
         // Button pressed, handle the press
-        // slowOpen();
+        mymotor->slowOpen();
         Serial.println("Intensity Button pressed....slow opening/closing");
-
         delay(30);
         // setup button to start blueTooth
         if(digitalRead(onOffButton)== HIGH){
@@ -84,21 +121,19 @@ void handleIntensityButtonPress() {
           } else {
             // start wifi service and turn off after 5 mins;
             Serial.println(" starting WIFI server");
-            
+            if ( ! turnOnWiFi() ){
+              blink(BUILTINPIN, 5, 10);
+            }
+            wifiStartMillis = millis();
           }
         }
         intensityButtonPressed = true; 
     } else if (intensityButtonPressed) {
         Serial.println("Intensity button released...handle the flags");
         // Button released, handle the release
-        // if (myservo.attached(sPin[k]) != 253 ){
-        //         Serial.printf("Pin[%d] is attached",k);
-        // }
         intensityButtonPressed = false;
-        // if (myservo.read(sPin[0])> SERVO_MIN_ANGLE) {
-        //     blindsOpen = true;
-        // }
-        // detachAll();
+        mymotor->cleanUpAfterSlowOpen();
+        mymotor->detachAll();
     }
 }
 
@@ -129,15 +164,15 @@ void handleOnOffButtonPress(){
         pressDuration = millis() - pressedTime;
         if (pressDuration >= SHORT_PRESS_TIME){
             //set the high level based on the current angle;
-            // if (blindsOpen){
+            if (mymotor->isBlindOpen()){
                 Serial.println(" *****Setting the max angles");
-                // setOpeningAngle();
-            // }
+                mymotor->setOpeningAngle();
+            }
         } else {
 
             delay(50);
-            // openOrCloseBlind();
-            // delay(200);
+            mymotor->openOrCloseBlind();
+            delay(200);
 
         }
     }
@@ -242,6 +277,11 @@ void setOTA(){
   ElegantOTA.onProgress(onOTAProgress);
   ElegantOTA.onEnd(onOTAEnd);
 }
+
+bool isWifiOn(){
+  return false;
+}
+
 void startWifi(){
 
   WiFi.begin(SSID, PASS_WD);
@@ -260,11 +300,19 @@ void startWifi(){
 }
 void setup()
 {
+
+
     pinMode(BUILTINPIN,OUTPUT);
     
     blink(BUILTINPIN, 1, 1000);
     bleInst = new bleClientObj();
     Serial.begin(115200);
+
+    // create motor instance;
+    mymotor = new motorObj();
+    
+    // set directions of the motors;
+    mymotor->setDirections(directions);
 
     // start WIFI;    
     startWifi();
@@ -275,9 +323,7 @@ void setup()
 
     server.serveStatic("/", LittleFS, "/");  
     blink(BUILTINPIN,2,1000);
-    // server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    //     request->send(200,(const char *)"text/html", (const char *)indexpage, nullptr);
-    // });
+
     // setup the server
     serverSetup();
     blink(BUILTINPIN,4,200);
@@ -342,6 +388,9 @@ void loop()
         Serial.println( " Scanning ... again...");
           // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
         bleInst->scan();
+    }
+    if (isWifiOn() && (millis() - wifiStartMillis) > 120000 ){
+      turnOffWiFi();
     }
     delay(500); 
 }
