@@ -29,6 +29,10 @@ bleClientObj::bleClientObj(){
 }
 //destructor
 
+void setMotor(motorObj *motor){
+    motor = motor;
+}
+
 // start the ble should be called when we are ready 
 void bleClientObj::scan(){
     /* Retrieve a Scanner and set the callback we want to use to be informed when we
@@ -39,7 +43,7 @@ void bleClientObj::scan(){
     pBLEScan->setInterval(1349);
     pBLEScan->setWindow(449);
     pBLEScan->setActiveScan(false);
-    pBLEScan->start(5, false);
+    pBLEScan->start(15, false);
     Serial.println(" Started active Scan...");
 }
 // this runs as soon as it finds an adversing server

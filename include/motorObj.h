@@ -1,4 +1,5 @@
-
+#ifndef MOTOR_OBJ_H
+#define MOTOR_OBJ_H
 #include <pwmWrite.h>
 
 #define SERVO_MAX_ANGLE 180
@@ -8,23 +9,34 @@ class motorObj{
 
     private:
 
-        const int numServos=3;
+        const int numServos;
         // servo Pins they are all standard
-        const int sPin[3] = { 0, 1, 2 };
+        int *sPin ;
         // readPins
-        const int rPin[3] = { 10,9,8 }; 
-        int direction[3] = {1,1,1} ;
+        int *rPin ; 
+        int *direction;
 
         float feedback;
         Pwm *myservo;
         bool servoAttached=false;
         double reading[20];
+        long int highestPosition = SERVO_MAX_ANGLE;
+        long int lowestPosition = SERVO_MIN_ANGLE;
         int maxOpenAngle = SERVO_MAX_ANGLE;
         int minOpenAngle = SERVO_MIN_ANGLE;
         bool blindsOpen=false;
+        long int updateTime;
+        int  limitFlag;
+        const int sliderMin = 0;
+        const int sliderMax = 100;
+        String blindName;
+
+
 
     public:
-        motorObj();
+        String status; // indicator of "open" or "close"
+
+        motorObj(int numMotors=1);
         ~motorObj();
         void setDirections(int * dirs);
         void slowOpen();
@@ -35,7 +47,23 @@ class motorObj{
         void setOpeningAngle();
         void openOrCloseBlind();
         int getFeedback(int);
-        long getPosition(int);
+        long int getPosition(int);
         void cleanUpAfterSlowOpen();
+        int getPositionOfMotor(int Pos=-1);
+        int getPositionOfSlider(long int sliderPos=-1);
+        int getLimitFlag();
+        String getBlindName();
+        void openBlinds();
+        void closeBlinds();
+        long int ifRunningHalt();
 
+        int setWindowMax(int pos);  // does nothing
+        int setWindowLow(int pos);  // does nothing
+
+        void FactoryReset();
+        void setSide(int direction, int index=0);
+        void setBlindName(String blindname);
+        void moveBlinds(int position);
 };
+
+#endif

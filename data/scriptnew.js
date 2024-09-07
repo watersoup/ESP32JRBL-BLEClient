@@ -3,7 +3,7 @@ const BlindsModule = (function () {
      // Private variables
     let blindName = "";
     let blindOpenFlag = 0; // 0 - closed/closing  1 - open/opening
-    let limitSetupFlag = 3;
+    let limitSetupFlag = 0;
     let previousValue = 0;
     let initializationFlag = 0;
 
@@ -354,10 +354,7 @@ const UIModule = (function () {
           if (BlindsModule.limitSetupFlag <3) {
             alert("(1)Windows limits have to be set first !:" + BlindsModule.limitSetupFlag);
             // Prevent the wsUpdateOpenRange function from being called
-            // event.preventDefault();
-            Slider.value = previousValue;
-            // Optionally, update the background or appearance based on the value
-            updateSliderBackground(Slider.value);
+            event.preventDefault();
             return;
           } else{
             previousValue = Slider.value;

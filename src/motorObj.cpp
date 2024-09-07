@@ -5,21 +5,29 @@
 #define ANGLE_INCREMENT 5
 #define maxFdBk 4095
 #define minFdBk 515
+int spinlist[5] = {9,8,7,6,5};
+int rpinlist[5] = {0, 1,2,3,4};
 
 
 
-motorObj::motorObj(){
+motorObj::motorObj(int numMotors): numServos(numMotors){
 
     // create sPin object
+    sPin = new int[numServos];
+    rPin = new int[numServos];
+    direction = new int[numServos];
 
-    // direction = new int[numServos];
-
+    for ( int k =0; k <numServos;k++){
+        sPin[k] = spinlist[k];
+        rPin[k] = rpinlist[k];
+        direction[k]=1;
+    }
     // initialize the sPin and rPin as per ESP32c3 super Mini by default;
     // Initialize pins
     myservo = new Pwm();
     for(int k=0; k<numServos;k++){
         pinMode(sPin[k], OUTPUT);
-        pinMode(rPin[k], INPUT);
+        pinMode(rPin[k], INPUT_PULLDOWN);
         myservo->attachServo(sPin[k],minUs, maxUs);
         delay(500);
         myservo->writeServo(sPin[k], SERVO_MAX_ANGLE);
@@ -31,9 +39,9 @@ motorObj::motorObj(){
 motorObj::~motorObj(){
     // destroy sPin and rPin;
     // destroy directions created;
-    // delete[] sPin;
-    // delete[] rPin;
-    // delete[] direction;
+    delete[] sPin;
+    delete[] rPin;
+    delete[] direction;
     delete myservo;
 }
 void motorObj::setDirections(int *dirs){
@@ -85,11 +93,31 @@ void motorObj::cleanUpAfterSlowOpen(){
     if ( myservo->read(sPin[0])> SERVO_MIN_ANGLE){
         blindsOpen = true;   
     }
+    detachAll();
 }
 
 bool motorObj::isBlindOpen(){
     return blindsOpen;
 }
+int motorObj::getLimitFlag(){
+    return limitFlag;
+}
+int motorObj::getPositionOfSlider(long int Pos){
+    if (Pos == -1){
+        return map(getPosition(0), lowestPosition,highestPosition,sliderMin, sliderMax);  
+    }
+    updateTime = millis();
+    return  map(Pos,lowestPosition,highestPosition, sliderMin,sliderMax);
+}
+// Get the position translated from slider to actual machine
+int motorObj::getPositionOfMotor(int sliderPos){
+  updateTime = millis(); 
+  if (sliderPos==-1){
+      return  getPosition(0); // get position of the motor at index0;
+  }
+  return map(sliderPos, sliderMin,sliderMax,minOpenAngle,maxOpenAngle);
+}
+
 bool motorObj::isOpen(){
     blindsOpen = false;
     int angle;
@@ -103,6 +131,13 @@ bool motorObj::isOpen(){
     return blindsOpen;
 }
 
+String motorObj::getBlindName(){
+    return blindName;
+}
+
+void motorObj::setBlindName(String blindname){
+    blindName = blindname;
+}
 
 int motorObj::getFeedback(int Pin)
 {
@@ -136,7 +171,7 @@ int motorObj::getFeedback(int Pin)
     result = mean / 8; // average useful readings
     return (result);
 }
-long motorObj::getPosition(int motor_n){
+long int motorObj::getPosition(int motor_n){
     int h = getFeedback(rPin[motor_n]);
     // Serial.printf("feedback[ %d  ]- %d\n ",motor_n, h);
     h = round(map(h, maxFdBk, minFdBk, SERVO_MIN_ANGLE, SERVO_MAX_ANGLE));
@@ -153,17 +188,96 @@ void motorObj::openOrCloseBlind(){
     Serial.print(" Blinds are: ");
     if (blindsOpen) {
         // Close the blinds
+        attachAll();
+        delay(100);
         Serial.println("Closing..");
         for (int k = 0; k< numServos; k++) {
             myservo->writeServo(sPin[k], (uint8_t) minOpenAngle );
         }
         blindsOpen = false;
+        status = "close";
+        delay(300);
+        detachAll();
     } else {
+        attachAll();
+        delay(100);
         Serial.println("Opening..");
         // Open the blinds
         for (int k = 0; k< numServos; k++) {
             myservo->writeServo(sPin[k], maxOpenAngle );
         }
         blindsOpen = true;
+        status = "open";
+        delay(300);
+        detachAll();
     }
+}
+
+void motorObj::openBlinds(){
+    attachAll();
+    delay(100);
+    Serial.println("Closing..");
+    for (int k = 0; k< numServos; k++) {
+        myservo->writeServo(sPin[k], (uint8_t) maxOpenAngle );
+    }
+    blindsOpen = false;
+    status = "open";
+    delay(300);
+    detachAll();
+}
+
+void motorObj::closeBlinds(){
+        // Close the blinds
+    attachAll();
+    delay(100);
+    Serial.println("Closing..");
+    for (int k = 0; k< numServos; k++) {
+        myservo->writeServo(sPin[k], (uint8_t) minOpenAngle );
+    }
+    blindsOpen = false;
+    status = "close";
+    delay(300);
+    detachAll();
+}
+
+long int motorObj::ifRunningHalt(){
+    // literally do nothing for Servo.
+    // as they are supposed to be very fast.
+    return getPosition(0);
+}
+
+int motorObj::setWindowMax(int pos){
+    // do nothing with the servo just return the slider value for current poisition
+    return getPositionOfSlider(-1);
+}
+int motorObj::setWindowLow(int pos){
+    // do nothing, servo are fast enough and not worth setting limits ;
+    return getPositionOfSlider( (long int)  -1);
+}
+
+void motorObj::FactoryReset(){
+    // YTD
+
+    // reset everything to the orginal format including name of the blind
+
+    // wipe away the slate clean;
+}
+
+void motorObj::setSide(int direction, int index){
+    // index: is the index of the motor that being identified as left or right
+    // direction : is either 1 or -1
+}
+
+// move to the given angle;
+void motorObj::moveBlinds(int Pos){
+    attachAll();
+    delay(100);
+    // Open the blinds
+    for (int k = 0; k< numServos; k++) {
+        myservo->writeServo(sPin[k], Pos );
+    }
+    blindsOpen = isBlindOpen();
+    status = blindsOpen? "open":"close";
+    delay(300);
+    detachAll();
 }

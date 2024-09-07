@@ -15,6 +15,8 @@
 #define LONG_PRESS_TIME 2000
 #define  MIN_PRESS_TIME 200
 #define SPIFFS LittleFS 
+#define CLOSEBLINDS 0
+#define OPENBLINDS 1
 
 AsyncWebServer server(80);
 DNSServer dnsServer;
@@ -24,6 +26,8 @@ AsyncWiFiManager *wifiManager = new AsyncWiFiManager(&server, &dnsServer);
 
 unsigned long ota_progress_millis = 0;
 unsigned long wifiStartMillis = 0;
+unsigned long bleStartMillis = 0;
+unsigned long lastUpdateTime;
 int BUILTINPIN = 8;
 const int onOffButton = 20;
 const int intensityButton = 21;
@@ -77,14 +81,17 @@ bool turnOnWiFi(){
       Serial.println("\nFailed to reconnect to Wi-Fi.");
       return false;
   }
+  // start the timer
+  wifiStartMillis = millis();
   return true;
 }
 bool turnOffWiFi(){
   Serial.println("turning Wifi off....");
-  ;   // Disconnect Wi-Fi and remove saved credentials
-  if (WiFi.disconnect(true) && WiFi.mode(WIFI_OFF)) {
+  // Disconnect Wi-Fi and do not remove saved credentials
+  // Turn off the Wi-Fi radio
+  if (WiFi.disconnect(false) && WiFi.mode(WIFI_OFF)) {
     return true;
-  }     // Turn off the Wi-Fi radio
+  }
   return false;
 }
 
@@ -108,7 +115,7 @@ void handleIntensityButtonPress() {
 
     if (digitalRead(intensityButton) == HIGH) {
         pressedTime = millis();
-        mymotor->attachAll();
+        if(!intensityButtonPressed) mymotor->attachAll();
         // Button pressed, handle the press
         mymotor->slowOpen();
         Serial.println("Intensity Button pressed....slow opening/closing");
@@ -122,9 +129,8 @@ void handleIntensityButtonPress() {
             // start wifi service and turn off after 5 mins;
             Serial.println(" starting WIFI server");
             if ( ! turnOnWiFi() ){
-              blink(BUILTINPIN, 5, 10);
+              blink(BUILTINPIN, 5, 100);
             }
-            wifiStartMillis = millis();
           }
         }
         intensityButtonPressed = true; 
@@ -133,7 +139,6 @@ void handleIntensityButtonPress() {
         // Button released, handle the release
         intensityButtonPressed = false;
         mymotor->cleanUpAfterSlowOpen();
-        mymotor->detachAll();
     }
 }
 
@@ -150,6 +155,7 @@ void handleOnOffButtonPress(){
           Serial.println("Bluetooth Scann to be started ...");
           if (! bleInst->isConnected()){
             bleInst->doScan=true;
+            bleStartMillis = millis();
           } else {
             // start wifi service and turn off after 5 mins;
             Serial.println(" starting WIFI server");
@@ -169,15 +175,172 @@ void handleOnOffButtonPress(){
                 mymotor->setOpeningAngle();
             }
         } else {
-
-            delay(50);
+            
             mymotor->openOrCloseBlind();
-            delay(200);
-
         }
     }
 }
 
+void notifyClients( int x = 1){
+  JsonDocument  jsonDoc;
+  jsonDoc["blindName"] = mymotor->getBlindName();
+  int openflag =mymotor->isBlindOpen()?1:0;
+  int limitflag = mymotor->getLimitFlag();
+  int pos = mymotor->getPositionOfSlider();
+  if ( x%2 == 0 ){
+   jsonDoc["status"] =openflag;
+  }
+  if (x%3 == 0){
+   jsonDoc["limitSetupFlag"] =limitflag;
+  }
+  if (x%5 == 0){
+   jsonDoc["sliderPosition"] = pos;
+  }
+
+  jsonDoc.shrinkToFit();
+  String jsonString;
+  serializeJson(jsonDoc,jsonString);
+  if (DEBUG) Serial.println(" NotifyClient " + String(x)+ " :" + jsonString);
+  ws.textAll(jsonString);
+  lastUpdateTime = millis();
+  delay(5*x);
+  
+}
+void notifyLog( String message){
+  ws.textAll("LOG :"+ message);
+}
+
+void handleSliderUpdate(String message) { //GOOD
+  // Handle setting the open range value based on the received value
+  JsonDocument  jsonDoc;
+  deserializeJson(jsonDoc, message);
+  jsonDoc.shrinkToFit();
+  int openRangeValue  = jsonDoc["sliderValue"].as<int>();  
+
+  mymotor->moveBlinds(mymotor->getPositionOfMotor(openRangeValue));
+  if ( DEBUG) Serial.println("WS_setSlider="+ mymotor->status + "ing " + String((const char*)jsonDoc["sliderValue"]));
+  notifyClients(10);
+}
+
+
+void handleSetupClick(AsyncWebSocketClient *client, String message){
+  // Parse the JSON data
+  JsonDocument  jsonDoc;
+  deserializeJson(jsonDoc, message);
+  jsonDoc.shrinkToFit();
+  // Handle the data as needed
+  int buttonStatus = jsonDoc["setupLimit"].as<int>();
+  int currpos;
+  if(DEBUG) Serial.println( "handleSetupClick " + String(buttonStatus));
+
+  long int slidervalue = -1;
+  if (mymotor->getLimitFlag() < 3){
+  
+  currpos = mymotor->ifRunningHalt();
+
+  // opening status then set UpperMost position
+    if (buttonStatus && (mymotor->getLimitFlag() != 2) ){
+      if (!mymotor->isBlindOpen())  client->text("LOG : Blind is closed, it should be open !!!");
+      slidervalue = mymotor->setWindowMax(currpos);
+      // if (DEBUG) Serial.println("SetupClick: max  Slider Position:"+ String(mymotor->getPositionOfSlider()));
+      //* 0 on the other end means completely open, need to be readjusted;
+
+    }else if ((buttonStatus==0) && (mymotor->getLimitFlag() != 1)){
+      if (mymotor->isBlindOpen())  client->text("LOG : Blind is Open, it should be closed !!!");
+      slidervalue = mymotor->setWindowLow(currpos);
+      // if (DEBUG) Serial.println("SetupClick : Low  Slider Position:"+ String(mymotor->getPositionOfSlider()));
+      // if blind is no closed notify of error in the co-ordination;
+    }
+    notifyClients(30);
+
+    if (DEBUG)
+      Serial.println("ws/setupLimit: sliderPos:"+ String(slidervalue) + " Status:"+
+          String(mymotor->isBlindOpen()) + " Limit:" + String(mymotor->getLimitFlag()));
+  }
+}
+
+void handleOnOff(String message){
+  // Parse the JSON data
+  JsonDocument  jsonDoc;
+  deserializeJson(jsonDoc, message);
+  jsonDoc.shrinkToFit();
+  // Handle the data as needed
+  int blindsStatus = jsonDoc["status"].as<int>();
+  if(DEBUG){
+    Serial.print(" handleOnOff .." + String(mymotor->isBlindOpen()));
+    Serial.flush();
+  } 
+  if (blindsStatus == OPENBLINDS ) {
+      // call appropriate function to open the blind
+    if(DEBUG) Serial.println(" Opening .." );
+    mymotor->openBlinds();
+  } else if ( blindsStatus == CLOSEBLINDS){
+    // call function to close blinds
+    if(DEBUG) Serial.println(" closing ..");
+    mymotor->closeBlinds();
+  }
+  notifyClients(2);
+}
+
+// handling factory reset request with secretkey;
+// should be called as <ipAddress>/reset?resetKey=<secretkey>
+void handleFactoryReset(String message) {
+    // Parse the JSON data
+    JsonDocument jsonDoc;
+    deserializeJson(jsonDoc, message);
+
+    // Check if the factoryReset flag is true and the provided secret key is correct
+    if (jsonDoc.containsKey("reset") ) {
+        
+        // Get the secret key from the message
+        String secretKey = jsonDoc["reset"].as<String>();
+        
+        // Perform additional checks if needed, and then proceed with the factory reset logic
+        if (secretKey == "XYZ123"){
+          // For example, you can clear the blindName
+          mymotor->FactoryReset();
+          ESP.restart();
+          
+        }
+        // Respond with a success message
+        ws.textAll("{\"factoryResetStatus\": \"success\"}");
+
+        if (DEBUG) Serial.println("Factory reset completed successfully");
+    } else {
+        // Respond with an error message
+        ws.textAll("{\"factoryResetStatus\": \"error\", \"message\": \"Invalid factory reset request.\"}");
+        if (DEBUG) Serial.println("Invalid factory reset request");
+    }
+}
+
+void handleFirstLoad(AsyncWebServerRequest *request){
+   String JSONstring = "";
+  bool reconnectFlag = false;
+  if (request->hasArg("blindName") && mymotor->getBlindName() == ""){
+    mymotor->setBlindName(request->arg("blindName"));
+    reconnectFlag=true;
+
+    if (request->hasArg("rightSide") ){
+      String direction = request->arg("rightSide");
+      direction.toUpperCase();
+      int dir = (direction.compareTo("YES")==0? 1 : -1);
+      mymotor->setSide(dir);
+      if (DEBUG ) Serial.println("Direction: " + String(dir) + " "+ direction );
+    }
+    int blindsOpenFlag = (mymotor->isBlindOpen()?OPENBLINDS:CLOSEBLINDS);
+
+    JSONstring = "{\"limitSetupFlag\":"+ String( mymotor->getLimitFlag()) + 
+                      ",\"blindName\":\"" + mymotor->getBlindName() +
+                      "\",\"status\":" + String(blindsOpenFlag) + "}";
+
+  }
+  if (DEBUG) Serial.println( JSONstring);
+  request->send(200, "application/json", JSONstring );  
+  if (reconnectFlag){
+  //   // rename the wifi site server to the name of the blindname
+    WiFi.hostname(mymotor->getBlindName());
+  }
+}
 
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
   if (type == WS_EVT_CONNECT) {
@@ -199,28 +362,29 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
         // Route for handling the momentary setup button click
         if ( message.indexOf("setupLimit") >= 0){      
             Serial.println(" REceived: setupLimit");
+            handleSetupClick(client, message);
         }
         // route the click of Close/Open blinds.
         if (message.indexOf("status") >=0 ){
             Serial.println(" HandleOnOff");
+            handleOnOff(message);
         }
         // Route for setting the slider value
         if (message.indexOf("sliderValue")>=0){
           Serial.println(" REceived: sliderValue");
+          handleSliderUpdate(message);
         }
         // Route for the very first request after load;
         if (message.indexOf("initialize")>=0){
           // notify client of existing parameter if they have already
           // been initialized;
           Serial.println(" Received: Initialize");
+          notifyClients(30);
         }
       }
   }
 }
 
-void handleFirstLoad( AsyncWebServerRequest *request){
-  Serial.println( "FirstLoad request from : " + request->client()->localIP());
-}
 
 void serverSetup() {
   // Serial.println("Server Setup in progress...");
@@ -243,7 +407,7 @@ void serverSetup() {
     if ( request->hasArg("resetKey")){
       String key = request->arg("resetKey");
       if (key == "XYZ123"){
-        // C1.FactoryReset();
+        // mymotor->FactoryReset();
 
         // Respond with a success message
         ws.textAll("{\"factoryResetStatus\": \"success\"}");
@@ -279,6 +443,10 @@ void setOTA(){
 }
 
 bool isWifiOn(){
+
+  if (WiFi.getMode() != WIFI_OFF){
+    return true;
+  }
   return false;
 }
 
@@ -297,6 +465,7 @@ void startWifi(){
   Serial.println(SSID);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  wifiStartMillis = millis();
 }
 void setup()
 {
@@ -308,11 +477,6 @@ void setup()
     bleInst = new bleClientObj();
     Serial.begin(115200);
 
-    // create motor instance;
-    mymotor = new motorObj();
-    
-    // set directions of the motors;
-    mymotor->setDirections(directions);
 
     // start WIFI;    
     startWifi();
@@ -331,7 +495,9 @@ void setup()
     setOTA();
     blink(BUILTINPIN,2,1000);
 
-    
+    // create motor instance;
+    mymotor = new motorObj(1);
+
     server.begin();
     blink(BUILTINPIN,5,200);
 
@@ -361,36 +527,23 @@ void loop()
             Serial.println("We are now connected to the BLE Server.");
             bleInst->doScan=false;
             // if connected shutdown the wifi
-        } 
-        else
-        {
-            Serial.println("We have failed to connect to the server; there is nothin more we will do.");
         }
         bleInst->doConnect = false;
-    }
-
-    /* If we are connected to a peer BLE Server, update the characteristic each time we are reached
-      with the current time since boot */
-    if (bleInst->connected)
-    {
-        // g_rxValue = pRemoteChar_2->readValue();
-        // Serial.println("read:" + String(g_rxValue.c_str()));
-        /* Set the characteristic's value to be the array of bytes that is actually a string */
-        int rand_num = -random(1000);
-        g_txValue = "Cl-2:" + String(rand_num);
-        Serial.println("---> " + String(rand_num));
-        bleInst->writeStatus(g_txValue);
-        blink(BUILTINPIN, 1, 500);
-    }
-    else if(bleInst->doScan)
+    }else if(bleInst->doScan)
     {
         blink(BUILTINPIN,2, 500);
         Serial.println( " Scanning ... again...");
-          // this is just example to start scan after disconnect, most likely there is better way to do it in arduino
         bleInst->scan();
+        delay(1000);
+        if ( ( millis() - bleStartMillis ) > 120000 ) {
+          bleInst->doScan=false;
+        }
     }
     if (isWifiOn() && (millis() - wifiStartMillis) > 120000 ){
-      turnOffWiFi();
+      if ( turnOffWiFi()) {
+        Serial.println("Wifi Turned off...");
+        blink(BUILTINPIN, 5, 100);
+      }
     }
     delay(500); 
 }
