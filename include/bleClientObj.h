@@ -11,6 +11,9 @@
 #include <BLEUtils.h>
 #include <BLEClient.h>
 #include <BLE2902.h>
+#ifndef MOTOR_OBJ_H
+#include <motorObj.h>
+#endif
 
 struct clientInfoPkg {
     uint16_t connId;
@@ -33,12 +36,18 @@ public:
     void notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
                             uint8_t* pData, size_t length, bool isNotify);
     clientInfoPkg getInfo();
+    void processCommand(const String& command);
+    
+    void setMotor(motorObj *motor);
+    // notify server about the status of the blinds
+    // if it is changed locally through BLE
+    void notifyBLEServer( int x=1);
 
     boolean doConnect =false;
     boolean connected = false;
-    boolean doScan = true;
+    boolean doScan = false;
 private:
-
+    motorObj *motor;
     BLEUUID serviceUUID;
     /* Specify the Characteristic UUID of Server  at a time only 6 */
     BLEUUID charUUIDarr[6], *charUUID;

@@ -29,6 +29,10 @@ bleClientObj::bleClientObj(){
 }
 //destructor
 
+void setMotor(motorObj *motor){
+    motor = motor;
+}
+
 // start the ble should be called when we are ready 
 void bleClientObj::scan(){
     /* Retrieve a Scanner and set the callback we want to use to be informed when we
@@ -39,7 +43,7 @@ void bleClientObj::scan(){
     pBLEScan->setInterval(1349);
     pBLEScan->setWindow(449);
     pBLEScan->setActiveScan(false);
-    pBLEScan->start(5, false);
+    pBLEScan->start(15, false);
     Serial.println(" Started active Scan...");
 }
 // this runs as soon as it finds an adversing server
@@ -64,6 +68,50 @@ void bleClientObj::onScanResult(BLEAdvertisedDevice advertisedServer){
 void bleClientObj::MyAdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice advertisedDevice)
 {
     ParentObj->onScanResult(advertisedDevice);
+}
+
+// process comands from the Server;
+void bleClientObj::processCommand(const String& command) {
+    if (command == "OPEN") {
+        Serial.println("Opening blinds");
+        // Add code to open blinds
+        if (motor != nullptr) {
+            motor->openBlinds();
+        }
+    } else if (command == "CLOSE") {
+        Serial.println("Closing blinds");
+        // Add code to close blinds
+        if (motor != nullptr) {
+            motor->closeBlinds();
+        }
+    } else if (command.startsWith("WINDOWMAX:")) { // of limit setting
+        int position = command.substring(13).toInt();
+        Serial.println("Setting position to: " + String(position) + "%");
+        // Add code to set blinds position
+        if (motor != nullptr) {
+            motor->setWindowMax(motor->getPositionOfMotor(position));
+        }
+    } else if (command.startsWith("WINDOWMIN:")) { // of limit setting
+        int position = command.substring(13).toInt();
+        Serial.println("Setting position to: " + String(position) + "%");
+        // Add code to set blinds position
+        if (motor != nullptr) {
+            motor->setWindowLow(motor->getPositionOfMotor(position));
+        }
+    }else if (command.startsWith("SLIDERPOSITION:")){ //slider moved
+        int position = command.substring(16).toInt();
+        Serial.println("Recd slider position: " + String(position) + "%");
+        if (motor != nullptr){
+            motor->moveBlinds(motor->getPositionOfMotor(position));
+        }
+    
+    }else {
+        Serial.println("Unknown command: " + command);
+    }
+}
+
+void bleClientObj::setMotor(motorObj *m) {
+    motor = m;
 }
 
 bool bleClientObj::connectCharacteristic(BLERemoteService *pRemoteService, BLEUUID l_CharUUID){
@@ -110,7 +158,7 @@ void bleClientObj::notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteris
 /* Start connection to the BLE Server */
 bool bleClientObj::connectToServer()
 {
-    if ( !connected and doConnect ){
+    if ( !connected && doConnect ){
         Serial.print("Forming a connection to ");
         Serial.println(myDevice->getAddress().toString().c_str());
         
@@ -178,4 +226,34 @@ void bleClientObj::writeStatus(const String msg){
     Serial.println(" WRITE STATUS: " + msg);
     pRemoteChar->writeValue(msg.c_str(), msg.length());
     delay(1000);
+}
+
+// broadasting info based on all prime number;
+// default is 'blindName' if we intend to add more than one blind
+// status: when divisible by 2,
+// limits flag: when divisible by 3,
+// SliderPosition when divisible by 5
+void bleClientObj::notifyBLEServer(int x)
+{
+    String msg;
+    msg = "blindName :" + motor->getBlindName();
+    writeStatus(msg);
+    int openflag = motor->isBlindOpen() ? 1 : 0;
+    int limitflag = motor->getLimitFlag();
+    int pos = motor->getPositionOfSlider();
+    if (x % 2 == 0)
+    {
+        msg = "status :"+ String(openflag);
+        writeStatus(msg);
+    }
+    if (x % 3 == 0)
+    {
+        msg = "limitSetupFlag :" + String(limitflag);
+        writeStatus(msg);
+    }
+    if (x % 5 == 0)
+    {
+        msg = "sliderPosition :" + String(pos);
+        writeStatus(msg);
+    }
 }
