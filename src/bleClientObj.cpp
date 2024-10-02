@@ -138,21 +138,23 @@ bool bleClientObj::connectCharacteristic(BLERemoteService *pRemoteService, BLEUU
 /* if server tries to contact and notify certain thing this is where
     it comes you can tackle the notification base*/
 void bleClientObj::notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
-                            uint8_t* pData, size_t length, bool isNotify)
-{
+                                  uint8_t* pData, size_t length, bool isNotify) {
 
-    if ( pBLERemoteCharacteristic->getUUID().equals(*charUUID)){
-        // Serial.print(" UUID 1 of data length ");
-        // Serial.println(length);
-        // uint32_t counter = pData[0];
-        // for(int i =1; i <length; i++){
-        //   counter = counter | (pData[i] <<i*8);
-        // }
-        Serial.print("RCD-1:");
-        for (int i = 0 ; i < length; i++){
-            Serial.print((char) pData[i]);
+    if (pBLERemoteCharacteristic->getUUID().equals(*charUUID)) {
+        Serial.print("Notification received, data length: ");
+        Serial.println(length);
+
+        // Convert the received data to a string
+        String receivedData;
+        for (int i = 0; i < length; i++) {
+            receivedData += (char)pData[i];
         }
-        Serial.println(".");
+
+        Serial.print("Received command: ");
+        Serial.println(receivedData);
+
+        // Process the received command (e.g., OPEN, CLOSE, SLIDERPOSITION:50, etc.)
+        processCommand(receivedData);
     } 
 }
 /* Start connection to the BLE Server */

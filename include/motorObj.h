@@ -12,13 +12,14 @@
 class motorObj{
 
     private:
-
+        const int spinlist[4] = {9, 8, 7, 6};
+        const int rpinlist[4] = {0, 1, 2, 3}; //analogpins
         const int numServos;
         // servo Pins they are all standard
-        int *sPin ;
+        int *sPin =nullptr;
         // readPins
-        int *rPin ; 
-        int *direction;
+        int *rPin =nullptr; 
+        int *direction = nullptr;
         // current angle 
         int currentAngle = 0 ; // completely cosed is what you start with.
 
@@ -26,7 +27,7 @@ class motorObj{
         bool savedFlag = false;
 
         float feedback;
-        Pwm *myservo;
+        Pwm *myservo = nullptr;
         bool servoAttached=false;
         double reading[20];
         
@@ -40,13 +41,13 @@ class motorObj{
 
         // slider position
         int currentSliderPosition;
-        const int sliderMin = 0;
-        const int sliderMax = 100;
+        int sliderMin = 0;
+        int sliderMax = 100;
 
         bool blindsOpen=false;
         long int updateTime;
         int  limitFlag; // 0 none set, 1 lowerlimit Set, 2 upperlimit set 3 - both limits set
-        String blindName ;
+        String blindName="";
 
         // memory size 
         const int totalEEPROMSize = 10*sizeof(int)+ 10*sizeof(char);

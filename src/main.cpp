@@ -4,6 +4,7 @@
 #include <BLEDevice.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <esp_mac.h>
 #include <ESPAsyncWiFiManager.h>
 #include <ElegantOTA.h>
 #include <LittleFSsupport.h>
@@ -41,7 +42,7 @@ unsigned long advertisingStartTime = 0;
 const unsigned long advertisingTimeout = 180000; // 180 seconds
 bool intensityButtonPressed = false;
 bool isInitialized = false;
-String servoPositions[4];
+
 
 int count = 0;
 bleClientObj *bleInst = nullptr;
@@ -161,6 +162,8 @@ void onOTAProgress(size_t current, size_t final)
 void notifyServer(int x = 1)
 {
   JsonDocument jsonDoc;
+  String jsonString ;
+
   jsonDoc["blindName"] = mymotor->getBlindName();
   int openflag = mymotor->isBlindOpen() ? 1 : 0;
   int limitflag = mymotor->getLimitFlag();
@@ -179,7 +182,6 @@ void notifyServer(int x = 1)
   }
 
   jsonDoc.shrinkToFit();
-  String jsonString;
   serializeJson(jsonDoc, jsonString);
   if (DEBUG)
     Serial.println(" NotifyClient " + String(x) + " :" + jsonString);
@@ -307,16 +309,20 @@ void notifyLog(String message)
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 {
   AwsFrameInfo *info = (AwsFrameInfo *)arg;
+  String jsonResponse;
+  String paramName;
+  String servoPositions[4];
+  int i;
+
 
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
   {
     JsonDocument doc;
     deserializeJson(doc, data);
-    String jsonstring ;
-    serializeJson(doc, jsonstring);
-
+    String jsonString ;
+    serializeJson(doc, jsonString);
     String action = doc["action"];
-
+    
     if (action == "getStatus")
     {
       JsonDocument response;
@@ -327,12 +333,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         response["blindsName"] = mymotor->getBlindName();
         response["servoCount"] = mymotor->getServoCount();
         JsonArray servos = response["servoPositions"].to<JsonArray>();
-        for (int i = 0; i < mymotor->getServoCount(); i++)
+        for (i = 0; i < mymotor->getServoCount(); i++)
         {
           servos.add(servoPositions[i]);
         }
       }
-      String jsonResponse;
       serializeJson(response, jsonResponse);
       ws.textAll(jsonResponse);
     }
@@ -340,37 +345,54 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     {
       
       int *dir;
+      JsonDocument response;     
       JsonObject data = doc["data"];
-      if(DEBUG) Serial.println(" Submit :" + jsonstring);
+      if(DEBUG) {
+        Serial.println(" Submit :" + jsonString);
+      }
 
       String Name = data["blindsName"].as<String>();
       int counts = data["servoCount"].as<int>();
       dir = new int[counts];
-
-      if (DEBUG) Serial.println("submit 1:");
-
-      for (int i = 0; i < counts; i++)
-      {
-        String paramName = "servo" + String(i + 1) + "Position";
-        servoPositions[i] = data[paramName].as<String>();
-
-        servoPositions[i].toLowerCase();
-        dir[i] = (servoPositions[i] == "left"? -1 : 1 );
-        if(DEBUG) Serial.println(" submit 2: " + String(i));
-      }
-
-      JsonDocument response;     
-
       if (!isInitialized) {
+
+        if (DEBUG) {
+          Serial.println("submit 1:" + String(counts));
+        }
+
+        for (int i = 0; i < counts; i++)
+        {
+          paramName = "servo" + String(i) + "Position";
+          servoPositions[i] = data[paramName].as<String>();
+
+          servoPositions[i].toLowerCase();
+          dir[i] = (servoPositions[i] == "left"? -1 : 1 );
+          if(DEBUG) {
+            Serial.println(" submit 2: " + String(i));
+          }
+        }
+
+
+        // If mymotor exists, delete the old one
+        if (mymotor != nullptr)
+        {
+            delete mymotor;
+            mymotor = nullptr;
+        }
         Serial.println("Submit: initialize-start...");
+
         // create motor object with relevant # of servos
         mymotor = new motorObj(counts, dir);
+
+        if(DEBUG) Serial.println("setting -BlindName..");
         mymotor->setBlindName(Name);
+
         // attach motor to the BLEObject
+        Serial.println(" Attaching motor...");
         bleInst->setMotor(mymotor);
 
         Serial.println("Submit: initialized..");
-        delete[] dir;
+
       } else{
         // throw error to the submit saying it has already been initialized
         // you might want to do factoryreset
@@ -517,10 +539,10 @@ void setup()
     // attach it to bleInst;
     bleInst->setMotor(mymotor);
   }
+  Serial.println("isInitialized = " + String(isInitialized));
 
   server.begin();
   blink(BUILTINPIN, 5, 200);
-
 
   initiate_buttons();
   blink(BUILTINPIN, 6, 200);
