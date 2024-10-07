@@ -51,7 +51,6 @@ String g_txValue;
 
 // create a motor object with 1 Servo;
 motorObj *mymotor;
-int directions[] = {1, 1, 1,1};
 
 void blink(const int PIN, int times = 1, long int freq = 500)
 {
@@ -167,7 +166,7 @@ void notifyServer(int x = 1)
   jsonDoc["blindName"] = mymotor->getBlindName();
   int openflag = mymotor->isBlindOpen() ? 1 : 0;
   int limitflag = mymotor->getLimitFlag();
-  int pos = mymotor->getPositionOfSlider();
+  int pos = mymotor->getCurrentSliderPosition();
   if (x % 2 == 0)
   {
     jsonDoc["status"] = openflag;
@@ -196,6 +195,28 @@ void notifyServer(int x = 1)
   delay(5 * x);
 }
 
+void handleBothButtonPush()
+{
+  mymotor->loadMotorParameters();
+  Serial.printf("servoCount = %d\n", mymotor->getServoCount());
+
+  Serial.println("Bluetooth Scann to be started ...");
+  if (!bleInst->isConnected())
+  {
+    bleInst->doScan = true;
+  }
+  else
+  {
+    // start wifi service and turn off after 5 mins;
+    Serial.println(" starting WIFI server");
+    if (!turnOnWiFi())
+    {
+      blink(BUILTINPIN, 5, 100);
+    }
+  }
+  intensityButtonPressed = false;
+}
+
 // / Function to handle intensity button press
 void handleIntensityButtonPress()
 {
@@ -214,21 +235,8 @@ void handleIntensityButtonPress()
     // setup button to start blueTooth
     if (digitalRead(onOffButton) == HIGH)
     {
-      Serial.println("Bluetooth Scann to be started ...");
-      if (!bleInst->isConnected())
-      {
-        bleInst->doScan = true;
-      }
-      else
-      {
-        // start wifi service and turn off after 5 mins;
-        Serial.println(" starting WIFI server");
-        if (!turnOnWiFi())
-        {
-          blink(BUILTINPIN, 5, 100);
-        }
-      }
-      intensityButtonPressed = false;
+      handleBothButtonPush();
+      return;
     }
   }
   else if (intensityButtonPressed)
@@ -254,21 +262,7 @@ void handleOnOffButtonPress()
     // setup button to start blueTooth
     if (digitalRead(intensityButton) == HIGH)
     {
-      Serial.println("Bluetooth Scann to be started ...");
-      if (!bleInst->isConnected())
-      {
-        bleInst->doScan = true;
-        bleStartMillis = millis();
-      }
-      else
-      {
-        Serial.println(" starting WIFI server");
-        // start wifi service and turn off after 5 mins;
-        if (!turnOnWiFi())
-        {
-          blink(BUILTINPIN, 5, 100);
-        }
-      }
+      handleBothButtonPush();
       return;
     }
 
@@ -311,7 +305,6 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
   AwsFrameInfo *info = (AwsFrameInfo *)arg;
   String jsonResponse;
   String paramName;
-  String servoPositions[4];
   int i;
 
 
@@ -323,6 +316,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     serializeJson(doc, jsonString);
     String action = doc["action"];
     
+    
     if (action == "getStatus")
     {
       JsonDocument response;
@@ -333,13 +327,22 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         response["blindsName"] = mymotor->getBlindName();
         response["servoCount"] = mymotor->getServoCount();
         JsonArray servos = response["servoPositions"].to<JsonArray>();
+        int * dirInt = mymotor->getDirections();
+        String dir="";
+        
         for (i = 0; i < mymotor->getServoCount(); i++)
         {
-          servos.add(servoPositions[i]);
+          dir = (dirInt[i] == 1 ?"Right": "Left");
+
+          servos.add(mymotor->getDirections()[i]);
         }
+
       }
+      
       serializeJson(response, jsonResponse);
+      
       ws.textAll(jsonResponse);
+
     }
     else if (action == "submit")
     {
@@ -356,6 +359,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       dir = new int[counts];
       if (!isInitialized) {
 
+        String *servoPositions = new String[counts];
         if (DEBUG) {
           Serial.println("submit 1:" + String(counts));
         }
@@ -401,10 +405,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         return;
       }
       isInitialized = true;
-      
-      // Save configuration to EEPROM or flash memory here
-      mymotor->saveMotorParameters();
-
+ 
       response["action"] = "submitResponse";
       response["message"] = "Configuration updated successfully";
       String jsonResponse;

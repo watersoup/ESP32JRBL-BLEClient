@@ -76,29 +76,22 @@ void bleClientObj::processCommand(const String& command) {
         Serial.println("Opening blinds");
         // Add code to open blinds
         if (motor != nullptr) {
-            motor->openBlinds();
+            motor->openOrCloseBlind();
         }
     } else if (command == "CLOSE") {
         Serial.println("Closing blinds");
         // Add code to close blinds
         if (motor != nullptr) {
-            motor->closeBlinds();
+            motor->openOrCloseBlind();
         }
-    } else if (command.startsWith("WINDOWMAX:")) { // of limit setting
+    } else if (command.startsWith("MAXOPENANGLE:")) { // of limit setting
         int position = command.substring(13).toInt();
         Serial.println("Setting position to: " + String(position) + "%");
         // Add code to set blinds position
         if (motor != nullptr) {
-            motor->setWindowMax(motor->getPositionOfMotor(position));
+            motor->setOpeningAngle(motor->getPositionOfMotor(position));
         }
-    } else if (command.startsWith("WINDOWMIN:")) { // of limit setting
-        int position = command.substring(13).toInt();
-        Serial.println("Setting position to: " + String(position) + "%");
-        // Add code to set blinds position
-        if (motor != nullptr) {
-            motor->setWindowLow(motor->getPositionOfMotor(position));
-        }
-    }else if (command.startsWith("SLIDERPOSITION:")){ //slider moved
+    } else if (command.startsWith("SLIDERPOSITION:")){ //slider moved
         int position = command.substring(16).toInt();
         Serial.println("Recd slider position: " + String(position) + "%");
         if (motor != nullptr){
@@ -242,7 +235,7 @@ void bleClientObj::notifyBLEServer(int x)
     writeStatus(msg);
     int openflag = motor->isBlindOpen() ? 1 : 0;
     int limitflag = motor->getLimitFlag();
-    int pos = motor->getPositionOfSlider();
+    int pos = motor->getCurrentSliderPosition();
     if (x % 2 == 0)
     {
         msg = "status :"+ String(openflag);
