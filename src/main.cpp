@@ -62,6 +62,7 @@ void blink(const int PIN, int times = 1, long int freq = 500)
     delay(freq);
   }
 }
+
 void notifyError(String message)
 {
   ws.textAll("LOG : " + message);
@@ -326,7 +327,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       {
         response["blindsName"] = mymotor->getBlindName();
         response["servoCount"] = mymotor->getServoCount();
-        JsonArray servos = response["servoPositions"].to<JsonArray>();
+        JsonArray servos = response["Direction"].to<JsonArray>();
         int * dirInt = mymotor->getDirections();
         String dir="";
         
@@ -334,7 +335,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         {
           dir = (dirInt[i] == 1 ?"Right": "Left");
 
-          servos.add(mymotor->getDirections()[i]);
+          servos.add(dir);
         }
 
       }
@@ -370,7 +371,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
           servoPositions[i] = data[paramName].as<String>();
 
           servoPositions[i].toLowerCase();
-          dir[i] = (servoPositions[i] == "left"? -1 : 1 );
+          dir[i] = (servoPositions[i].equals("left")? -1 : 1 );
           if(DEBUG) {
             Serial.println(" submit 2: " + String(i));
           }

@@ -8,8 +8,7 @@
 #define ANGLE_INCREMENT 5
 #define maxFdBk 4095
 #define minFdBk 515
-
-
+#define junkfeed 0xe000
 // this constructor is to make sure that the if it was already initialized
 // it will read from the EEPROM
 motorObj::motorObj() : numServos(0)
@@ -17,10 +16,12 @@ motorObj::motorObj() : numServos(0)
     // check EEPROM memory
     if(DEBUG) Serial.println("Initializing EEPROM of size: " + String(totalEEPROMSize) + " bytes");
 
-    EEPROM.begin(totalEEPROMSize + EEPROM_ADDRESS);
-    delay(100);
+    // MYPrefs.begin("system", false);
+    // MYMEM.begin(EEPROM_ADDRESS);
 
-    if (!isEEPROMRangeEmpty(EEPROM_ADDRESS, 0x080 ))
+    delay(100); 
+
+    if (!isEEPROMRangeEmpty())
     {
         if (DEBUG)
             Serial.println(" EEPROM is not empty ");
@@ -28,18 +29,19 @@ motorObj::motorObj() : numServos(0)
         Serial.println(" numServos loaded:"+ String(numServos));
         initializePins(numServos);
         initializeServo();
-
+        moveBlinds(getPositionOfMotor(currentSliderPosition));
     }
     else
     {
         if (DEBUG)
             Serial.println("EEPROM  is Empty");
-        // EEPROM is empty, initialize with default value
+        // MYMEM is empty, initialize with default value
     }
 }
 
 motorObj::motorObj(int numMotors) : numServos(numMotors)
 {
+    // MYMEM.begin(EEPROM_ADDRESS);
 
     currentSliderPosition = sliderMin;
     // initialize the sPin and rPin as per ESP32c3 super Mini by default;
@@ -51,6 +53,7 @@ motorObj::motorObj(int numMotors) : numServos(numMotors)
 
 motorObj::motorObj(int numMotors, int *dirs) : numServos(numMotors)
 {
+    // MYMEM.begin(EEPROM_ADDRESS);
 
     currentSliderPosition = sliderMin;
 
@@ -64,7 +67,6 @@ motorObj::motorObj(int numMotors, int *dirs) : numServos(numMotors)
 
     initializeServo();
 
-    // initialize EEPROM
 }
 
 motorObj::~motorObj()
@@ -468,12 +470,17 @@ void motorObj::FactoryReset()
     // reset everything to the orginal format including name of the blind
     if (DEBUG)
         Serial.print(" Emptying the memory");
-    for (int i = EEPROM_ADDRESS; i < totalEEPROMSize; i++)
-    {
-        EEPROM.put(i, 0xFF);
-    }
-    EEPROM.commit();
-    delay(1000);
+    // for (int i = EEPROM_ADDRESS; i < (EEPROM_ADDRESS+ totalEEPROMSize); i++)
+    // {
+    //     MYMEM.writeByte(i, 0xFF);
+    // }
+    // MYMEM.commit();
+    MYPrefs.begin("system", false);
+    delay(100);
+    MYPrefs.clear();
+    MYPrefs.end();
+    delay(100);
+
     if (DEBUG)
         Serial.println(" ...Done");
 
@@ -489,6 +496,7 @@ void motorObj::moveBlinds(int angle)
     // Move each servo to the given angle, taking direction into account
     for (int k = 0; k < numServos; k++)
     {
+
         int adjustedAngle = direction[k] == 1 ? angle : (maxOpenAngle - angle);
         myservo->writeServo(sPin[k], adjustedAngle);
         delay(50);
@@ -501,136 +509,95 @@ void motorObj::moveBlinds(int angle)
     saveMotorParameters();
 }
 
-// save motor parameters to EEPROM
+// save motor parameters to MYMEM
 void motorObj::saveMotorParameters()
 {
 
+    size_t bytesWritten;
     if(DEBUG) Serial.print("Saving motor ");
-    int address = EEPROM_ADDRESS;
-    int tmpVal;
 
-    tmpVal = numServos;
-    EEPROM.put(address, tmpVal);
-    address += sizeof(int);
+    MYPrefs.begin("system", false);
+    delay(100);
+    MYPrefs.putInt("numServos", numServos);
+    bytesWritten = MYPrefs.putBytes("dirs", (byte *) direction, numServos*sizeof(int));
+    if (DEBUG && bytesWritten == sizeof(direction)) Serial.println("Directions saved.");
+    delay(40);
+    MYPrefs.putBool("BldOflag", blindsOpen);
+    delay(10);
+    MYPrefs.putInt("curSlPos", currentSliderPosition);
+    delay(10);
+    MYPrefs.putInt("limitFlag", limitFlag);
+    delay(10);
+    MYPrefs.putInt("maxOangle", maxOpenAngle);
+    delay(10);
+    MYPrefs.putInt("minOangle", minOpenAngle);
+    delay(10);
+    MYPrefs.putString("blindName", blindName.substring(0,10));
+    delay(100);
+    MYPrefs.end();
 
-    if(DEBUG) Serial.print(" .");
-    for (int k = 1; k <= 4; k++)
-    {
-        if (k <= numServos)
-            EEPROM.put(address, direction[k - 1]);
-        address += sizeof(int);
-        // esp_task_wdt_reset();  // Feed the watchdog
-
-    }
-    if(DEBUG) Serial.print(" .");
-    int blindOpenInt = (blindsOpen ? 1 : 0);
-    EEPROM.put(address, blindOpenInt);
-    address += sizeof(int);
-
-    if(DEBUG) Serial.print(" .");
-    // Save integer parameters
-    EEPROM.put(EEPROM_ADDRESS, currentSliderPosition);
-    address += sizeof(int);
-
-    if(DEBUG) Serial.print(" .");
-    EEPROM.put(address, limitFlag);
-    address += sizeof(int);
-
-    if(DEBUG) Serial.print(" .");
-    EEPROM.put(address, maxOpenAngle);
-    address += sizeof(int);
-    
-    if(DEBUG) Serial.print(" .");
-    EEPROM.put(address, minOpenAngle);
-    address += sizeof(int);
-
-    // Save String parameter
-    if(DEBUG) Serial.print(" .");
-    // Convert the String to a char array
-    char blindNameArray[10];  // Assuming a max name length of 32 characters
-    blindName.toCharArray(blindNameArray, sizeof(blindNameArray));    
-    EEPROM.writeString(address, blindNameArray);
-    address +=sizeof(blindNameArray);
-    
-    if(DEBUG) Serial.print(" .");
-    EEPROM.commit(); // Don't forget to commit changes
-    // esp_task_wdt_reset();  // Feed the watchdog
+  
+    // if(DEBUG) Serial.print(" .");
+    // MYMEM.commit(); // Don't forget to commit changes
+    // // esp_task_wdt_reset();  // Feed the watchdog
     if (DEBUG)
         Serial.println("SAVED Parameters for blinds : " + blindName);
-    delay(100);
 }
 
-bool motorObj::isEEPROMRangeEmpty(int startAddress, int endAddress)
+bool motorObj::isEEPROMRangeEmpty()
 {
-    for (int i = startAddress; i <= endAddress; i++)
-    {
-        if (EEPROM.read(i) != 0xFF)
-        {
-            return false;
-        }
-    }
-    return true;
+    bool isEmpty = true;
+    MYPrefs.begin("system", false);
+    delay(100);
+    isEmpty = (MYPrefs.getInt("numServos", -1) == -1);
+    delay(100);
+    MYPrefs.end();
+    return isEmpty;
 }
 
-// save motor parameters to EEPROM
+// save motor parameters to MYMEM
 void motorObj::loadMotorParameters()
 {
-
     if(DEBUG) Serial.println("LoadMotorParameters...");
-    int address = EEPROM_ADDRESS;
-    // Save integer parameters
-    int N;
-    EEPROM.get(address,N);
-    address += sizeof(int);
-    if (DEBUG) Serial.println("numServo: " + String(N));
-    numServos = N;
+    // int address = EEPROM_ADDRESS;
+    MYPrefs.begin("system", false);
+    delay(100);
 
-    int dir;
-    for (int k = 0; k < 4; k++)
-    {
-        if (k < numServos){
-            EEPROM.get(address, dir);
-            if (DEBUG) Serial.printf("Direction [ %d ] = %d\n", k, dir);
-            direction[k] = dir;
-        } 
-        address += sizeof(int);
-        
+    numServos = MYPrefs.getInt("numServos", numServos);
+    if(DEBUG) Serial.println("numServos: "+String(numServos));
+
+    numServos = (numServos>4?4:numServos);
+
+    if (direction == nullptr){
+        direction = new int[numServos];
     }
+    MYPrefs.getBytes("dirs", (byte *) direction, numServos*sizeof(int));
+    delay(100);
+    // for(int k=0;k<numServos;k++){
+    //     if(DEBUG) Serial.printf("Direction [ %d ] = %d\n", k, direction[k]);
+    // }
 
-    int blindOpenInt;
-    EEPROM.get(address, blindOpenInt);
-    blindsOpen = (blindOpenInt == 1 ? true : false);
-    address += sizeof(int);
+    blindsOpen = MYPrefs.getBool("BldOflag", false);
 
-    EEPROM.get(address, currentSliderPosition);
-    address += sizeof(int);
+    currentSliderPosition = MYPrefs.getInt("curSlPos", -1);
 
-    EEPROM.get(address, limitFlag);
-    address += sizeof(int);
+    limitFlag = MYPrefs.getInt("limitFlag", 0);
 
-    EEPROM.get(address, maxOpenAngle);
-    address += sizeof(int);
-    if (DEBUG) Serial.printf("maxOpenAngle: %d\n", maxOpenAngle);
+    maxOpenAngle = MYPrefs.getInt("maxOangle", SERVO_MAX_ANGLE);
 
-    EEPROM.get(address, minOpenAngle);
-    address += sizeof(int);
-    if (DEBUG) Serial.printf("minOpenAngle: %d\n", minOpenAngle);
+    minOpenAngle = MYPrefs.getInt("minOangle", SERVO_MIN_ANGLE);
 
-    // Retrieve the blind name as a char array
-    char blindNameArray[10];  // Assuming a max name length of 32 characters
-    EEPROM.get(address, blindNameArray);
-    blindName = String(blindNameArray);  // Convert char array back to String
-    address += sizeof(blindNameArray);
+    blindName = MYPrefs.getString("blindName", "");
+
+
+
+    MYPrefs.end();
+    delay(200);
 
     if (DEBUG)
-        Serial.printf("parameter Loaded: %s \n\t #servo: %d \n\tOpenFlag: %d\n", 
-            blindName.c_str(),numServos, blindOpenInt );
-    delay(200);
-    if (blindName != "" )
-    {
-        if ( currentSliderPosition!=-1 )
-            moveBlinds(getPositionOfMotor(currentSliderPosition));
-        return;
-    }
-    if(DEBUG) Serial.println("ERROR blindName is missing.");
+        Serial.printf("parameter Loaded: %s \n\t #servo: %d \n\tOpenFlag: %d\n\
+        \tCurrentSliderPos: %d\n\tLimitFlag: %d\n\tMaxOpenAngle: %d\n\tMinOpenAngle: %d\n", \
+            blindName.c_str(),numServos, blindsOpen , currentSliderPosition, limitFlag, \
+            maxOpenAngle, minOpenAngle);
+
 }

@@ -1,7 +1,10 @@
 #ifndef MOTOR_OBJ_H
 #define MOTOR_OBJ_H
 #include <pwmWrite.h>
-#define EEPROM_ADDRESS 0x050
+#include "EEPROM.h"
+#include <Preferences.h>
+
+#define EEPROM_ADDRESS 0x00
 #ifndef DEBUG
 #define DEBUG 1
 #endif
@@ -12,7 +15,8 @@
 class motorObj{
 
     private:
-        const int spinlist[4] = {9, 8, 7, 6};
+        // servo parameters
+        const int spinlist[4] = {10, 9, 7, 6};
         const int rpinlist[4] = {0, 1, 2, 3}; //analogpins
         int numServos;
         // servo Pins they are all standard
@@ -31,6 +35,7 @@ class motorObj{
         bool servoAttached=false;
         double reading[20];
 
+        Preferences MYPrefs;
         
         // semi permanant max and min angles;
         int maxOpenAngle = SERVO_MAX_ANGLE;
@@ -108,7 +113,7 @@ class motorObj{
 
         void saveMotorParameters();  // save parameter of the various motors to the EEPROM
         void loadMotorParameters();
-        bool isEEPROMRangeEmpty(int startAddress, int endAddress);
+        bool isEEPROMRangeEmpty();
 };
 
 #endif
