@@ -53,7 +53,7 @@ private:
     BLEUUID charUUIDarr[6], *charUUID;
 
 
-    BLEAdvertisedDevice* myDevice;
+    BLEAdvertisedDevice* bleServerHub;
     const int BUILTINPIN = 8;
 
     // Only one characteristics should be connected at most

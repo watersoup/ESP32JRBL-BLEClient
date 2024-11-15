@@ -142,6 +142,8 @@ bool turnOffWiFi()
   }
   return false;
 }
+
+// Start OTAs
 void onOTAStart()
 {
   // Log when OTA has started

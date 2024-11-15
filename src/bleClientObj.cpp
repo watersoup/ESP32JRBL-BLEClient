@@ -8,7 +8,7 @@ bleClientObj::bleClientObj(){
     doConnect = false;
     connected = false;
     doScan = false;
-    myDevice = nullptr;
+    bleServerHub = nullptr;
     const int BUILTINPIN = 8;
     std::string g_rxValue;
     String g_txValue;
@@ -49,7 +49,7 @@ void bleClientObj::scan(){
 // this runs as soon as it finds an adversing server
 void bleClientObj::onScanResult(BLEAdvertisedDevice advertisedServer){
     Serial.print("BLE Advertised Device found: ");
-    Serial.print(advertisedServer.toString().c_str());Serial.print( "->");
+    Serial.print(advertisedServer.getName().c_str());Serial.print( "->");
     Serial.println(advertisedServer.haveServiceUUID() ? "YES": "NO---");
 
     /* We have found a device, let us now see if it contains the service we are looking for. */
@@ -57,7 +57,7 @@ void bleClientObj::onScanResult(BLEAdvertisedDevice advertisedServer){
         advertisedServer.getServiceUUID().equals(serviceUUID) ) )
     {
         BLEDevice::getScan()->stop();
-        myDevice = new BLEAdvertisedDevice(advertisedServer);
+        bleServerHub = new BLEAdvertisedDevice(advertisedServer);
         doConnect = true;
         doScan = false;
     } else {
@@ -148,45 +148,59 @@ void bleClientObj::notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteris
 
         // Process the received command (e.g., OPEN, CLOSE, SLIDERPOSITION:50, etc.)
         processCommand(receivedData);
-    } 
+    }
 }
 /* Start connection to the BLE Server */
 bool bleClientObj::connectToServer()
 {
-    if ( !connected && doConnect ){
+    if (!connected && doConnect)
+    {
         Serial.print("Forming a connection to ");
-        Serial.println(myDevice->getAddress().toString().c_str());
-        
-        BLEClient*  pClient  = BLEDevice::createClient();
+        Serial.println(bleServerHub->getAddress().toString().c_str());
+
+        BLEClient *pClient = BLEDevice::createClient();
         Serial.println(" - Created client");
 
         pClient->setClientCallbacks(new MyClientCallback(this));
 
         /* Connect to the remote BLE Server */
-        pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-        Serial.println(" - Connected to server");
+        if (pClient->connect(bleServerHub)) // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+            Serial.println(" - Connected to server");
+        else
+        {
+            Serial.println(" - couldn't Connect to server");
+            delete pClient;
+            return false;
+        }
 
         /* Obtain a reference to the service we are after in the remote BLE server */
-        BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
+        BLERemoteService *pRemoteService = pClient->getService(serviceUUID);
         if (pRemoteService == nullptr)
         {
-        Serial.print("Failed to find our service UUID: ");
-        Serial.println(serviceUUID.toString().c_str());
-        pClient->disconnect();
-        return false;
+            Serial.print("Failed to find our service UUID: ");
+            Serial.println(serviceUUID.toString().c_str());
+            pClient->disconnect();
+            delete pClient;
+            return false;
         }
+
         Serial.println(" - Found our service");
 
-        for ( int i=0 ; i < 6; i ++){
-            connected = connectCharacteristic(pRemoteService, charUUIDarr[i] );
-            if (connected == true) {
+        for (int i = 0; i < 6; i++)
+        {
+            connected = connectCharacteristic(pRemoteService, charUUIDarr[i]);
+            if (connected == true)
+            {
                 charUUID = &(charUUIDarr[i]);
                 Serial.println("Connected to character = " + String(i));
                 break;
             }
         }
-        if ( connected == false){
+        if (connected == false)
+        {
             pClient->disconnect();
+            delete pClient;
+            delete pRemoteService;
             Serial.println("At least one charactersitic UUID not found");
             return false;
         }
@@ -216,6 +230,8 @@ bool bleClientObj::isConnected(){
 void bleClientObj::readStatus(){
 
 }
+
+// write the status to the server
 void bleClientObj::writeStatus(const String msg){
 
     Serial.println(" WRITE STATUS: " + msg);
