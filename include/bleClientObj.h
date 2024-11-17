@@ -82,4 +82,32 @@ private:
 
 };
 
+class MySecurity : public BLESecurityCallbacks {
+    uint32_t onPassKeyRequest() {
+        Serial.println("PassKeyRequest");
+        return 123456; // Set your passkey here
+    }
+
+    void onPassKeyNotify(uint32_t pass_key) {
+        Serial.println("On passkey Notify number: " + String(pass_key));
+    }
+
+    bool onConfirmPIN(uint32_t pass_key) {
+        Serial.println("Confirming PIN: " + String(pass_key));
+        return true;
+    }
+
+    bool onSecurityRequest() {
+        Serial.println("Security Request");
+        return true;
+    }
+
+    void onAuthenticationComplete(esp_ble_auth_cmpl_t cmpl) {
+        if (cmpl.success) {
+            Serial.println("Pairing success");
+        } else {
+            Serial.println("Pairing failed");
+        }
+    }
+};
 #endif  //BLECLIENT_OBJ_H
