@@ -110,7 +110,7 @@ void motorObj::initializeServo()
         delay(1000);
         myservo->detach(sPin[k]);
         
-        if(DEBUG) Serial.printf("Initiate Servos: numservos: %d, K = %d\n", numServos,k);
+        if(DEBUG) Serial.printf("\t Nservo=%d [%d] -> %d\n", numServos,k,adjustedAngle);
     }
     if(DEBUG) Serial.println(" Done");
 }
@@ -161,12 +161,14 @@ void motorObj::setDirections(int *dirs)
 
 void motorObj::attachAll()
 {
+    if(DEBUG) Serial.println("Attaching all servos");
     int k1;
     if (!servoAttached)
     {
         for (int k = 0; k < numServos; k++)
         {
-            k1 = myservo->attachServo(sPin[k], minUs, maxUs);
+            if (direction[k] == 1) k1 = myservo->attachServo(sPin[k], minUs, maxUs);
+            else k1 = myservo->attachServo(sPin[k],  maxUs,minUs);
             if (k1 == 253 || k1 == 255)
             {
                 Serial.printf(" Couldn't Attach : %d \n", k1);
@@ -187,6 +189,7 @@ void motorObj::detachAll()
             myservo->detach(sPin[k]);
         }
     }
+    if(DEBUG) Serial.println("Detached all servos");
     servoAttached = false;
 }
 
@@ -199,8 +202,9 @@ void motorObj::slowOpen()
         pos_deg=-1;
         ch = myservo->attached(sPin[k]);
         pos_deg = myservo->read(sPin[k]);
-        Serial.printf(".. posdeg : %d ch: %d \n", pos_deg, ch);
+        
         adjustedAngle =  direction[k]*ANGLE_INCREMENT;
+        Serial.printf(".. posdeg : %d ch: %d --> %d\n", pos_deg, ch, adjustedAngle);
         // Increase intensity
         myservo->writeServo(sPin[k], (pos_deg + adjustedAngle));
         delay(20);

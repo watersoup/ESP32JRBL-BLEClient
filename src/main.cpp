@@ -223,10 +223,20 @@ void handleBothButtonPush()
 // / Function to handle intensity button press
 void handleIntensityButtonPress()
 {
+  pressedTime = millis();
+
   // Check for intensity button press
   if (digitalRead(intensityButton) == HIGH)
   {
-    pressedTime = millis();
+    delay(20);
+    // setup button to start blueTooth
+    if (digitalRead(onOffButton) == HIGH)
+    {
+
+      handleBothButtonPush();
+      return;
+    }
+
     if (!intensityButtonPressed)
       mymotor->attachAll();
     // Button pressed, handle the press
@@ -235,12 +245,6 @@ void handleIntensityButtonPress()
     delay(30);
     intensityButtonPressed = true;
 
-    // setup button to start blueTooth
-    if (digitalRead(onOffButton) == HIGH)
-    {
-      handleBothButtonPush();
-      return;
-    }
   }
   else if (intensityButtonPressed)
   {
@@ -262,6 +266,7 @@ void handleOnOffButtonPress()
     Serial.println(" handleOnoffButtonPress..");
     pressedTime = millis();
 
+    delay(20);
     // setup button to start blueTooth
     if (digitalRead(intensityButton) == HIGH)
     {
@@ -273,7 +278,7 @@ void handleOnOffButtonPress()
     // Wait for button release
     while (digitalRead(onOffButton) == HIGH)
     {
-      delay(10);
+      delay(50);
     }
     pressDuration = millis() - pressedTime;
     if (pressDuration >= SHORT_PRESS_TIME)
@@ -292,6 +297,7 @@ void handleOnOffButtonPress()
     notifyServer(2);
   }
 }
+
 // broadasting info based on all prime number;
 // default is 'blindName' if we intend to add more than one blind
 // status: when divisible by 2,

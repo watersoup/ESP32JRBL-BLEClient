@@ -26,6 +26,15 @@ bleClientObj::bleClientObj(){
     // initialize the BLE device;
     BLEDevice::init("JRcl");
 
+
+    BLESecurity *pSecurity = new BLESecurity();
+    pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
+    pSecurity->setCapability(ESP_IO_CAP_IO);
+    pSecurity->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    pSecurity->setKeySize(16);
+    pSecurity->setStaticPIN(123456); // Set your static PIN here
+    BLEDevice::setSecurityCallbacks(new MySecurity());
+
 }
 //destructor
 
@@ -216,15 +225,20 @@ void bleClientObj::MyClientCallback::onConnect(BLEClient* pclient)
     Serial.println("onConnect \n");
     ParentObj->connected = true;
 }
+
+//
 void bleClientObj::MyClientCallback::onDisconnect(BLEClient* pclient)
 {
     ParentObj->connected = false;
     Serial.println("onDisconnect");
     ParentObj->doScan=true;
 }
+
+//
 bool bleClientObj::isConnected(){
     return connected;
 }
+
 // this will read in the status on request but if it is notified then
 // it will go to notify, so bascially one can call notify from this function
 void bleClientObj::readStatus(){
