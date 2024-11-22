@@ -26,6 +26,7 @@ struct clientInfoPkg {
 class bleClientObj {
 public:
     bleClientObj();
+    void configSecurity();
     void scan();
     bool connectToServer();
     bool isConnected();
@@ -33,8 +34,8 @@ public:
     void writeStatus(const String msg);
     void onScanResult(BLEAdvertisedDevice advertisingServer);
     bool connectCharacteristic(BLERemoteService*, BLEUUID);
-    void notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
-                            uint8_t* pData, size_t length, bool isNotify);
+    void notifyCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic,
+                        uint8_t *pData, size_t length, bool isNotify);
     clientInfoPkg getInfo();
     void processCommand(const String& command);
     
@@ -46,6 +47,9 @@ public:
     boolean doConnect =false;
     boolean connected = false;
     boolean doScan = false;
+    boolean recdDataFlag = false;
+
+    String receivedData="";
 private:
     motorObj *motor;
     BLEUUID serviceUUID;
@@ -59,7 +63,7 @@ private:
     // Only one characteristics should be connected at most
     
     BLERemoteCharacteristic *pRemoteChar = nullptr;
-
+    BLEClient *pClient = nullptr;
 
     /* Scan for BLE servers and find the first one that advertises the service we are looking for. */
     class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks

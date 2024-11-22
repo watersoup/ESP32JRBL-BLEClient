@@ -25,8 +25,12 @@ bleClientObj::bleClientObj(){
 
     // initialize the BLE device;
     BLEDevice::init("JRcl");
+    // set the security
+    // configSecurity();
 
-
+}
+//destructor
+void bleClientObj::configSecurity(){
     BLESecurity *pSecurity = new BLESecurity();
     pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
     pSecurity->setCapability(ESP_IO_CAP_IO);
@@ -34,12 +38,6 @@ bleClientObj::bleClientObj(){
     pSecurity->setKeySize(16);
     pSecurity->setStaticPIN(123456); // Set your static PIN here
     BLEDevice::setSecurityCallbacks(new MySecurity());
-
-}
-//destructor
-
-void setMotor(motorObj *motor){
-    motor = motor;
 }
 
 // start the ble should be called when we are ready 
@@ -79,38 +77,6 @@ void bleClientObj::MyAdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice adv
     ParentObj->onScanResult(advertisedDevice);
 }
 
-// process comands from the Server;
-void bleClientObj::processCommand(const String& command) {
-    if (command == "OPEN") {
-        Serial.println("Opening blinds");
-        // Add code to open blinds
-        if (motor != nullptr) {
-            motor->openOrCloseBlind();
-        }
-    } else if (command == "CLOSE") {
-        Serial.println("Closing blinds");
-        // Add code to close blinds
-        if (motor != nullptr) {
-            motor->openOrCloseBlind();
-        }
-    } else if (command.startsWith("MAXOPENANGLE:")) { // of limit setting
-        int position = command.substring(13).toInt();
-        Serial.println("Setting position to: " + String(position) + "%");
-        // Add code to set blinds position
-        if (motor != nullptr) {
-            motor->setOpeningAngle(motor->getPositionOfMotor(position));
-        }
-    } else if (command.startsWith("SLIDERPOSITION:")){ //slider moved
-        int position = command.substring(16).toInt();
-        Serial.println("Recd slider position: " + String(position) + "%");
-        if (motor != nullptr){
-            motor->moveBlinds(motor->getPositionOfMotor(position));
-        }
-    
-    }else {
-        Serial.println("Unknown command: " + command);
-    }
-}
 
 void bleClientObj::setMotor(motorObj *m) {
     motor = m;
@@ -128,14 +94,19 @@ bool bleClientObj::connectCharacteristic(BLERemoteService *pRemoteService, BLEUU
     }
     Serial.println(" - Found our characteristic");
 
-    if(pRemoteCharacteristic->canNotify())
+    if(pRemoteCharacteristic->canNotify()){
+      Serial.println("Characteristic can notify :" + String(l_CharUUID.toString().c_str()));
       pRemoteCharacteristic->registerForNotify(
                 [this](BLERemoteCharacteristic *pRemoteCharacteristic, uint8_t* pData, 
                             size_t length, bool isNotify) { 
                     this->notifyCallback(pRemoteCharacteristic, pData, length, isNotify);
                    });
+    } else {
+        Serial.println("Characteristic can't notify");
+    }
     return true;
 }
+
 
 /* if server tries to contact and notify certain thing this is where
     it comes you can tackle the notification base*/
@@ -143,11 +114,7 @@ void bleClientObj::notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteris
                                   uint8_t* pData, size_t length, bool isNotify) {
 
     if (pBLERemoteCharacteristic->getUUID().equals(*charUUID)) {
-        Serial.print("Notification received, data length: ");
-        Serial.println(length);
-
-        // Convert the received data to a string
-        String receivedData;
+          // Convert the received data to a string
         for (int i = 0; i < length; i++) {
             receivedData += (char)pData[i];
         }
@@ -155,8 +122,8 @@ void bleClientObj::notifyCallback(BLERemoteCharacteristic* pBLERemoteCharacteris
         Serial.print("Received command: ");
         Serial.println(receivedData);
 
-        // Process the received command (e.g., OPEN, CLOSE, SLIDERPOSITION:50, etc.)
-        processCommand(receivedData);
+        // set recd. data flag to true
+        recdDataFlag = true;
     }
 }
 /* Start connection to the BLE Server */
@@ -167,7 +134,7 @@ bool bleClientObj::connectToServer()
         Serial.print("Forming a connection to ");
         Serial.println(bleServerHub->getAddress().toString().c_str());
 
-        BLEClient *pClient = BLEDevice::createClient();
+        pClient = BLEDevice::createClient();
         Serial.println(" - Created client");
 
         pClient->setClientCallbacks(new MyClientCallback(this));
@@ -195,8 +162,7 @@ bool bleClientObj::connectToServer()
 
         Serial.println(" - Found our service");
 
-        for (int i = 0; i < 6; i++)
-        {
+        for (int i = 0; i < 6; i++) {
             connected = connectCharacteristic(pRemoteService, charUUIDarr[i]);
             if (connected == true)
             {
@@ -205,8 +171,7 @@ bool bleClientObj::connectToServer()
                 break;
             }
         }
-        if (connected == false)
-        {
+        if (connected == false) {
             pClient->disconnect();
             delete pClient;
             delete pRemoteService;
@@ -245,12 +210,55 @@ void bleClientObj::readStatus(){
 
 }
 
+// process comands from the Server;
+void bleClientObj::processCommand(const String& command) {
+    if (command == "OPEN") {
+        Serial.println("Opening blinds");
+        // Add code to open blinds
+        if (motor != nullptr) {
+            motor->openOrCloseBlind();
+        }
+    } else if (command == "CLOSE") {
+        Serial.println("Closing blinds");
+        // Add code to close blinds
+        if (motor != nullptr) {
+            motor->openOrCloseBlind();
+        }
+    } else if (command.startsWith("MAX/")) { // of limit setting
+        int position = command.substring(13).toInt();
+        Serial.println("Setting position to: " + String(position) + "%");
+        // Add code to set blinds position
+        if (motor != nullptr) {
+            motor->setOpeningAngle(motor->getPositionOfMotor(position));
+        }
+    } else if (command.startsWith("SP/")){ //slider moved
+        int position = command.substring(16).toInt();
+        Serial.println("Recd slider position: " + String(position) + "%");
+        if (motor != nullptr){
+            motor->moveBlinds(motor->getPositionOfMotor(position));
+        }
+    
+    }else {
+        command = "N/A : " + command;
+        writeStatus(command);
+    }
+}
+
+
 // write the status to the server
 void bleClientObj::writeStatus(const String msg){
 
-    Serial.println(" WRITE STATUS: " + msg);
-    pRemoteChar->writeValue(msg.c_str(), msg.length());
-    delay(1000);
+    if (pRemoteChar == nullptr) {
+        Serial.println("Remote Char not found");
+        return;
+    }
+    // check if the remote char can be written
+    if (pRemoteChar->canWrite()){
+        if(DEBUG) Serial.println("Write->" + String(pRemoteChar->getUUID().toString().c_str()));
+        pRemoteChar->writeValue((uint8_t*)msg.c_str(),msg.length(),true);
+    }else {
+        Serial.println("Remote Char not writable");
+    }
 }
 
 // broadasting info based on all prime number;

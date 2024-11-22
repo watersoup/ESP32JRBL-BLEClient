@@ -30,9 +30,13 @@ motorObj::motorObj() : numServos(0)
         initializePins(numServos);
         initializeServo();
         moveBlinds(getPositionOfMotor(currentSliderPosition));
+        Initialized=true;
+        //initialize the blindName if not set;
+        if (blindName == "") blindName = "JRBlind";
     }
     else
     {
+        Initialized=false;
         if (DEBUG)
             Serial.println("EEPROM  is Empty");
         // MYMEM is empty, initialize with default value
@@ -93,6 +97,11 @@ motorObj::~motorObj()
     }
 }
 
+bool motorObj::isInitialized()
+{
+    return Initialized;
+}
+
 void motorObj::initializeServo()
 {
     int adjustedAngle ;
@@ -102,6 +111,8 @@ void motorObj::initializeServo()
     {
         pinMode(sPin[k], OUTPUT);
         pinMode(rPin[k], INPUT_PULLDOWN);
+        // if (direction[k] == 1) myservo->attachServo(sPin[k], minUs, maxUs);
+        // else myservo->attachServo(sPin[k],  maxUs, minUs);
         myservo->attachServo(sPin[k], minUs, maxUs);
         delay(500);
         adjustedAngle = direction[k] == 1 ?   SERVO_MAX_ANGLE: SERVO_MIN_ANGLE;
@@ -110,12 +121,12 @@ void motorObj::initializeServo()
         delay(1000);
         myservo->detach(sPin[k]);
         
-        if(DEBUG) Serial.printf("\t Nservo=%d [%d] -> %d\n", numServos,k,adjustedAngle);
+        if(DEBUG) Serial.printf("\tNservo=%d [%d] -> %d", numServos,k,adjustedAngle);
     }
     if(DEBUG) Serial.println(" Done");
 }
 
-void motorObj::setBlindName(String name)
+void motorObj::setBlindName(const String& name)
 {
     blindName = name;
 }
@@ -128,7 +139,7 @@ void motorObj::initializePins(int numMotors)
     rPin = new int[numServos];
     for (int k = 0; k < numServos; k++)
     {
-        Serial.printf("\tk=%d\n",k);
+        Serial.printf("\tk=%d",k);
         sPin[k] = spinlist[k];
         rPin[k] = rpinlist[k];
     }
@@ -150,25 +161,27 @@ void motorObj::setDirections(int *dirs)
     }
 
     direction = new int[numServos]; // Allocate new memory for the directions
-
+    Serial.print("Directions..");
     // Copy directions
     for (int k = 0; k < numServos; k++) {
         direction[k] = dirs[k];
+        Serial.printf(" %d ", direction[k]);
     }
-
-    if(DEBUG) Serial.println("Directions set successfully.");
+    if(DEBUG) Serial.println(" ... set successfully.");
 }
 
 void motorObj::attachAll()
 {
-    if(DEBUG) Serial.println("Attaching all servos");
     int k1;
     if (!servoAttached)
     {
+        if(DEBUG) Serial.println("Attaching all servos");
+
         for (int k = 0; k < numServos; k++)
         {
-            if (direction[k] == 1) k1 = myservo->attachServo(sPin[k], minUs, maxUs);
-            else k1 = myservo->attachServo(sPin[k],  maxUs,minUs);
+            // if (direction[k] == 1) k1 = myservo->attachServo(sPin[k], minUs, maxUs);
+            k1 = myservo->attachServo(sPin[k], minUs, maxUs);
+            // else k1 = myservo->attachServo(sPin[k],  maxUs,minUs);
             if (k1 == 253 || k1 == 255)
             {
                 Serial.printf(" Couldn't Attach : %d \n", k1);
@@ -176,6 +189,7 @@ void motorObj::attachAll()
             }
         }
     }
+    readFlag = true;
     servoAttached = true;
 }
 
@@ -195,20 +209,30 @@ void motorObj::detachAll()
 
 void motorObj::slowOpen()
 {
-    int ch, pos_deg, adjustedAngle;
+    int ch, pos_deg, newAngle;
     // Button pressed, handle the press
     for (int k = 0; k < numServos; k++)
     {
         pos_deg=-1;
         ch = myservo->attached(sPin[k]);
-        pos_deg = myservo->read(sPin[k]);
         
-        adjustedAngle =  direction[k]*ANGLE_INCREMENT;
-        Serial.printf(".. posdeg : %d ch: %d --> %d\n", pos_deg, ch, adjustedAngle);
+        if (direction[k] == 1){
+            pos_deg = myservo->read(sPin[k]);
+            newAngle =  (pos_deg + ANGLE_INCREMENT);
+        }
+        else {
+            if (readFlag)
+                pos_deg = maxOpenAngle - myservo->read(sPin[k]);
+            else
+                pos_deg = myservo->read(sPin[k]);
+            newAngle =  (pos_deg - ANGLE_INCREMENT);
+        }
+        if(DEBUG) Serial.printf(".. posdeg : %d ch: %d -> %d\n", pos_deg, ch, newAngle);
         // Increase intensity
-        myservo->writeServo(sPin[k], (pos_deg + adjustedAngle));
+        myservo->writeServo(sPin[k], newAngle);
         delay(20);
     }
+    readFlag = false;
 }
 
 void motorObj::cleanUpAfterSlowOpen()
@@ -231,6 +255,7 @@ int motorObj::getLimitFlag()
 int motorObj::getCurrentSliderPosition(){
     return currentSliderPosition;
 }
+
 // get position translate from machine to slider position;
 // it also gets current position translated;
 int motorObj::getPositionOfSlider(int angle)
@@ -246,6 +271,7 @@ int motorObj::getPositionOfSlider(int angle)
 
     return map( angle ,minOpenAngle, maxOpenAngle,  sliderMin, sliderMax);
 }
+
 // Get the position translated from slider to actual machine
 // or just the current angle of machine;
 int motorObj::getPositionOfMotor(int sliderPos)
@@ -420,15 +446,18 @@ void motorObj::openOrCloseBlind()
 
 void motorObj::openBlinds()
 {
+    int adjustedAngle;
     attachAll();
     delay(100);
-    Serial.println("Opening..");
+    if(DEBUG) Serial.println("Opening..");
     for (int k = 0; k < numServos; k++)
     {
-        int adjustedAngle = (direction[k] == 1 ? maxOpenAngle : minOpenAngle);
+        adjustedAngle = (direction[k] == 1 ? maxOpenAngle : minOpenAngle);
+        if(DEBUG) Serial.printf("\t [%d] to %d", k+1, adjustedAngle);
         myservo->writeServo(sPin[k], adjustedAngle);
         delay(1000);
     }
+    if (DEBUG) Serial.println("..Done");
     blindsOpen = true;
     status = "open";
     delay(300);
@@ -438,17 +467,20 @@ void motorObj::openBlinds()
 void motorObj::closeBlinds()
 {
     // Close the blinds
+    int adjustedAngle ;
     attachAll();
     delay(100);
     Serial.println("Closing..");
     for (int k = 0; k < numServos; k++)
     {
-        int adjustedAngle = direction[k] == 1 ? minOpenAngle : maxOpenAngle;
+        adjustedAngle = direction[k] == 1 ? minOpenAngle : maxOpenAngle;
+        if(DEBUG) Serial.printf("\t [%d] to %d", k+1, adjustedAngle);
         myservo->writeServo(sPin[k], adjustedAngle);
         delay(1000);
     }
     blindsOpen = false;
     status = "close";
+    if (DEBUG) Serial.println("..Done");
     delay(300);
     detachAll();
 }
@@ -495,13 +527,14 @@ void motorObj::FactoryReset()
 // move to the given angle;
 void motorObj::moveBlinds(int angle)
 {
+    int adjustedAngle;
     attachAll();
     delay(100);
     // Move each servo to the given angle, taking direction into account
     for (int k = 0; k < numServos; k++)
     {
 
-        int adjustedAngle = direction[k] == 1 ? angle : (maxOpenAngle - angle);
+        adjustedAngle = direction[k] == 1 ? angle : (maxOpenAngle - angle);
         myservo->writeServo(sPin[k], adjustedAngle);
         delay(50);
     }

@@ -349,6 +349,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       }
       
       serializeJson(response, jsonResponse);
+      if(DEBUG) Serial.println(" getStatus : " + jsonResponse);
       
       ws.textAll(jsonResponse);
 
@@ -356,55 +357,43 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     else if (action == "submit")
     {
       
-      int *dir;
+      int *dirVec;
       JsonDocument response;     
       JsonObject data = doc["data"];
       if(DEBUG) {
         Serial.println(" Submit :" + jsonString);
       }
 
-      String Name = data["blindsName"].as<String>();
       int counts = data["servoCount"].as<int>();
-      dir = new int[counts];
+      dirVec = new int[counts];
       if (!isInitialized) {
 
-        String *servoPositions = new String[counts];
-        if (DEBUG) {
-          Serial.println("submit 1:" + String(counts));
-        }
-
+        // get the servo positions
         for (int i = 0; i < counts; i++)
         {
-          paramName = "servo" + String(i) + "Position";
-          servoPositions[i] = data[paramName].as<String>();
-
-          servoPositions[i].toLowerCase();
-          dir[i] = (servoPositions[i].equals("left")? -1 : 1 );
-          if(DEBUG) {
-            Serial.println(" submit 2: " + String(i));
-          }
+          paramName = "servo" + String(i+1) + "Position";
+          dirVec[i] = data[paramName].as<String>() == "left" ? -1 : 1;
+          Serial.printf("dirVec[%d] = %s - %d\n", i, data[paramName].as<String>(),dirVec[i]);
         }
 
-
         // If mymotor exists, delete the old one
-        if (mymotor != nullptr)
-        {
+        if (mymotor != nullptr)  {
             delete mymotor;
             mymotor = nullptr;
         }
-        Serial.println("Submit: initialize-start...");
 
         // create motor object with relevant # of servos
-        mymotor = new motorObj(counts, dir);
+        mymotor = new motorObj(counts, dirVec);
+        Serial.println("Submit: Created Motor object ");
 
-        if(DEBUG) Serial.println("setting -BlindName..");
-        mymotor->setBlindName(Name);
+        mymotor->setBlindName(data["blindsName"].as<String>());
 
         // attach motor to the BLEObject
         Serial.println(" Attaching motor...");
         bleInst->setMotor(mymotor);
 
-        Serial.println("Submit: initialized..");
+        Serial.println("Submit: done...");
+        delete dirVec;
 
       } else{
         // throw error to the submit saying it has already been initialized
@@ -522,6 +511,7 @@ void setup()
 
   blink(BUILTINPIN, 1, 1000);
   bleInst = new bleClientObj();
+  
   Serial.begin(115200);
 
   // start WIFI;
@@ -543,7 +533,7 @@ void setup()
 
   // create motor instance;
   mymotor = new motorObj();
-  if (mymotor->getBlindName() != "") {
+  if (mymotor->isInitialized()) {
     Serial.println(" BlindName : " + mymotor->getBlindName());
     isInitialized=true;
     // attach it to bleInst;
@@ -597,6 +587,12 @@ void loop()
       Serial.println("Wifi Turned off...");
       blink(BUILTINPIN, 5, 100);
     }
+  }
+  if (bleInst->recdDataFlag)
+  {
+    bleInst->processCommand(bleInst->receivedData);
+    bleInst->recdDataFlag = false;
+    bleInst->receivedData = "";
   }
   delay(500);
 }

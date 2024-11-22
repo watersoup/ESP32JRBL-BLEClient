@@ -48,7 +48,9 @@ function loadExistingConfiguration(data) {
     // Set servo positions after a short delay to ensure elements are created
     setTimeout(() => {
         data['Direction'].forEach((position, index) => {
-            document.getElementById(`servo${index + 1}Position`).value = position;
+            const lowerCasePosition = position.toLowerCase();
+            // alert(lowerCasePosition);
+            document.getElementById(`servo${index + 1}Position`).value = lowerCasePosition;
         });
     }, 100);
 

@@ -34,6 +34,7 @@ class motorObj{
         Pwm *myservo = nullptr;
         bool servoAttached=false;
         double reading[20];
+        bool Initialized = false;
 
         Preferences MYPrefs;
         
@@ -63,6 +64,9 @@ class motorObj{
         void openBlinds();
         void closeBlinds();
 
+        // sticky flag for servos's get_pos values using read
+        bool readFlag = false;
+
     public:
         String status; // indicator of "open" or "close"
         // blank construtor for reading EEPROM
@@ -70,7 +74,7 @@ class motorObj{
 
         motorObj(int numMotors);
 
-        motorObj(int numMotors, int* dir);
+        motorObj(int numMotors, int * dirs);
 
         ~motorObj();
 
@@ -83,7 +87,9 @@ class motorObj{
         // angle to which to open the motor to.
         void setOpeningAngle(int angle=-1);
         void setClosingAngle(int angle = -1);
-        void setBlindName(String name);
+        void setBlindName(const String &name);
+
+        bool isInitialized();
 
         void openOrCloseBlind();
         int getFeedback(int);
