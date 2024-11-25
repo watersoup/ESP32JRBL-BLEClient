@@ -79,9 +79,10 @@ class motorObj{
         ~motorObj();
 
 
-        void slowOpen();
+
         void attachAll();
         void detachAll();
+        void slowMove();
         bool isOpen();
         bool isBlindOpen();
         // angle to which to open the motor to.
@@ -96,7 +97,7 @@ class motorObj{
         long int getPosition(int);
         long int getPosWoAttaching(int motor_n);
 
-        void cleanUpAfterSlowOpen();
+        void cleanUpAfterSlowMove();
 
         // get position of the slider converted to motor position
         int getPositionOfMotor(int sliderPos=-1);

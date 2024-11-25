@@ -240,7 +240,7 @@ void handleIntensityButtonPress()
     if (!intensityButtonPressed)
       mymotor->attachAll();
     // Button pressed, handle the press
-    mymotor->slowOpen();
+    mymotor->slowMove();
     Serial.println("Intensity Button pressed....slow opening/closing");
     delay(30);
     intensityButtonPressed = true;
@@ -251,7 +251,7 @@ void handleIntensityButtonPress()
     Serial.println("Intensity button released...handle the flags");
     // Button released, handle the release
     intensityButtonPressed = false;
-    mymotor->cleanUpAfterSlowOpen();
+    mymotor->cleanUpAfterSlowMove();
     notifyServer(10);
   }
 }
@@ -288,6 +288,9 @@ void handleOnOffButtonPress()
       {
         Serial.println(" *****Setting the max angles");
         mymotor->setOpeningAngle();
+      } else {
+        Serial.println(" *****Setting the min angles");
+        mymotor->setClosingAngle();
       }
     }
     else
@@ -427,6 +430,8 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         String jsonResponse;
         serializeJson(response, jsonResponse);
         ws.textAll(jsonResponse);
+        isInitialized = false;
+        ESP.restart();
       }
       else
       {
