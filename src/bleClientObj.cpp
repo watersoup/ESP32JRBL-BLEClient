@@ -239,8 +239,8 @@ void bleClientObj::processCommand(const String& command) {
         }
     
     }else {
-        command = "N/A : " + command;
-        writeStatus(command);
+        String newcommand = "N/A : " + command;
+        writeStatus(newcommand);
     }
 }
 

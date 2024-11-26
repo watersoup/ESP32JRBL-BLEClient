@@ -110,6 +110,8 @@ class motorObj{
 
         String getBlindName();
 
+        int getAvgFeedback(int Pin);
+
         int getServoCount();
 
         int *getDirections();
