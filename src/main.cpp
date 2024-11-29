@@ -532,6 +532,9 @@ void serverSetup()
   ws.onEvent(onWsEvent);
 
   // Route for serving the HTML page
+  server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send(LittleFS, "/setup.html", "text/html"); });
+  // Route for serving the HTML page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(LittleFS, "/index.html", "text/html"); });
 }
@@ -669,6 +672,5 @@ void loop()
     bleInst->recdDataFlag = false;                 // Reset the received data flag
     bleInst->receivedData = "";                     // Clear the received data
   }
-
-  delay(100); // Short delay to prevent overwhelming the loop
+  blink(BUILTINPIN, 1, 200); // Blink LED once with 100ms interval
 }

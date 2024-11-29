@@ -61,9 +61,6 @@ class motorObj{
         // check if the motor with spin is attached;
         bool isAttached(int Pin);
 
-        void openBlinds();
-        void closeBlinds();
-
         // sticky flag for servos's get_pos values using read
         bool readFlag = false;
 
@@ -93,6 +90,8 @@ class motorObj{
         bool isInitialized();
 
         void openOrCloseBlind();
+        void openBlinds();
+        void closeBlinds();
         int getFeedback(int);
         long int getPosition(int);
         long int getPosWoAttaching(int motor_n);
