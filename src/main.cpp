@@ -39,7 +39,7 @@ AsyncWiFiManager *wifiManager = new AsyncWiFiManager(&server, &dnsServer);
 unsigned long ota_progress_millis = 0;
 unsigned long wifiStartMillis = 0;
 unsigned long bleStartMillis = 0;
-unsigned long lastUpdateTime;
+unsigned long lastUpdateTime =0, lastBlinkTime=0;
 
 // Define pin numbers
 int BUILTINPIN = 8;            // Built-in LED pin
@@ -202,7 +202,11 @@ void notifyServer(int x = 1)
   int openflag = mymotor->isBlindOpen() ? 1 : 0;
   int limitflag = mymotor->getLimitFlag();
   int pos = mymotor->getCurrentSliderPosition();
+  if ( limitflag == 3){
+    // put off wifi as the setup is done;
+    turnOffWiFi();
 
+  }
   // Conditionally add fields based on divisibility of x
   if (x % 2 == 0)
   {
@@ -224,14 +228,14 @@ void notifyServer(int x = 1)
   if (DEBUG)
     Serial.println(" NotifyClient " + String(x) + " :" + jsonString);
 
-  ws.textAll(jsonString); // Send JSON to all WebSocket clients
+  if (ws.count() > 0)
+    ws.textAll(jsonString); // Send JSON to all WebSocket clients
 
   // If BLE server is active, notify through BLE object as well
   if (bleInst != nullptr && bleInst->isConnected())
-  {
     bleInst->notifyBLEServer(x);
-  }
 
+  mymotor->saveMotorParameters(); // Save motor parameters to EEPROM
   lastUpdateTime = millis(); // Update the last update time
   delay(5 * x);              // Delay based on parameter x
 }
@@ -267,7 +271,7 @@ void handleIntensityButtonPress()
   // Check if intensity button is pressed
   if (digitalRead(intensityButton) == HIGH)
   {
-    delay(20); // Debounce delay
+    delay(100); // Debounce delay
 
     // Check if On/Off button is also pressed
     if (digitalRead(onOffButton) == HIGH)
@@ -303,10 +307,8 @@ void handleOnOffButtonPress()
   currentState = digitalRead(onOffButton); // Read the current state of the On/Off button
   if (currentState == HIGH)
   {
-    Serial.println(" handleOnoffButtonPress..");
     pressedTime = millis(); // Record the time when button was pressed
-
-    delay(20); // Debounce delay
+    delay(100); // Debounce delay
 
     // Check if Intensity button is also pressed
     if (digitalRead(intensityButton) == HIGH)
@@ -314,6 +316,7 @@ void handleOnOffButtonPress()
       handleBothButtonPush();
       return;
     }
+    Serial.println(" handleOnoffButtonPress..");
 
     // Wait for button release
     while (digitalRead(onOffButton) == HIGH)
@@ -325,22 +328,24 @@ void handleOnOffButtonPress()
     if (pressDuration >= SHORT_PRESS_TIME)
     {
       // Set the angle based on whether blinds are open or closed
-      if (mymotor->isBlindOpen())
+      if (!mymotor->isBlindOpen())
       {
-        Serial.println(" *****Setting the max angles");
+        if(DEBUG) Serial.println(" *****Setting the max angles");
         mymotor->setOpeningAngle();
+        mymotor->openBlinds();
       }
       else
       {
-        Serial.println(" *****Setting the min angles");
+        if(DEBUG) Serial.println(" *****Setting the min angles");
         mymotor->setClosingAngle();
+        mymotor->closeBlinds();
       }
     }
     else
     {
       mymotor->openOrCloseBlind(); // Toggle the blinds
     }
-    notifyServer(2); // Notify server with x=2
+    notifyServer(10); // Notify server with x=2
   }
 }
 
@@ -367,7 +372,20 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     serializeJson(doc, jsonString); // Serialize it back to string for debugging
     String action = doc["action"];  // Extract the action field
 
-    if (action == "getStatus")
+    if (action == "OPEN")
+    {
+      mymotor->openBlinds(); // Open the blinds
+      notifyServer(10);       // Notify server with x=3
+    }
+    else if (action == "CLOSE")
+    {
+      mymotor->closeBlinds(); // Close the blinds
+      notifyServer(10);        // Notify server with x=4
+    }else if (action == "setupLimits"){
+      if(mymotor->setLimits())
+        notifyServer(10); // Notify server with x=5
+    }
+    else if (action == "getStatus")
     {
       JsonDocument response;
       response["action"] = "status";
@@ -378,7 +396,9 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
         // If initialized, include blinds name and servo count
         response["blindsName"] = mymotor->getBlindName();
         response["servoCount"] = mymotor->getServoCount();
-
+        response["limitFlag"] = mymotor->getLimitFlag();
+        response["status"] = (mymotor->isBlindOpen()?1:0);
+        response["sliderPosition"] = mymotor->getCurrentSliderPosition();
         // Create a JSON array for servo directions
         JsonArray servos = response["Direction"].to<JsonArray>();
         int *dirInt = mymotor->getDirections();
@@ -655,8 +675,8 @@ void loop()
     }
   }
 
-  // Manage WiFi connection: Turn off WiFi after 5 minutes of being on
-  if (isWifiOn() && (millis() - wifiStartMillis) > 300000)
+  // Manage WiFi connection: Turn off WiFi after 20 minutes of being on
+  if (isWifiOn() && (millis() - wifiStartMillis) > 1200000)
   {
     if (turnOffWiFi())
     {
@@ -671,6 +691,12 @@ void loop()
     bleInst->processCommand(bleInst->receivedData); // Process the received command
     bleInst->recdDataFlag = false;                 // Reset the received data flag
     bleInst->receivedData = "";                     // Clear the received data
+    notifyServer(10);                               // Notify server with x=10
   }
-  blink(BUILTINPIN, 1, 200); // Blink LED once with 100ms interval
+  if ( (millis() - lastBlinkTime) > 5000)
+  {
+    blink(BUILTINPIN, 1, 100); // Blink LED once with 100ms interval
+    lastBlinkTime = millis();
+  }
+  
 }

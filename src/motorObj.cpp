@@ -258,30 +258,28 @@ int motorObj::getCurrentSliderPosition(){
 // it also gets current position translated;
 int motorObj::getPositionOfSlider(int angle)
 {
-    
+    int sliderpos;
     if (angle == -1)
-    {
-        if(DEBUG) Serial.println("getPositionOfSlider : "+ String(angle));
-        return map( getPosition(0), minOpenAngle, maxOpenAngle, sliderMin, sliderMax);
-        
-    }
+        sliderpos =  map( getPosition(0), minOpenAngle, maxOpenAngle, sliderMin, sliderMax);    
+     else
+        sliderpos = map( angle ,minOpenAngle, maxOpenAngle,  sliderMin, sliderMax);
+    
+    if(DEBUG) Serial.printf("getPositionOfSlider : %d -> %d\n", angle, sliderpos);
     updateTime = millis();
-
-    return map( angle ,minOpenAngle, maxOpenAngle,  sliderMin, sliderMax);
+    return sliderpos;
 }
 
 // Get the position translated from slider to actual machine
 // or just the current angle of machine;
 int motorObj::getPositionOfMotor(int sliderPos)
 {
+    int angle=-1;
     updateTime = millis();
     if (sliderPos == -1)
-    {
-        return getPosition(0); // get position of the motor at index0;
-    }
-    if(DEBUG) Serial.printf("sliderPos : %d\n", sliderPos );
-
-    return map(sliderPos, sliderMin, sliderMax, minOpenAngle, maxOpenAngle);
+        angle =  getPosition(0); // get position of the motor at index0;
+    else angle = map(sliderPos, sliderMin, sliderMax, minOpenAngle, maxOpenAngle);
+    if(DEBUG) Serial.printf("getPositionOfMotor : %d -> %d \n", sliderPos,angle );
+    return angle;
 }
 
 bool motorObj::isOpen()
@@ -371,17 +369,17 @@ int motorObj::getFeedback(int Pin)
         mean += analogRead((uint8_t) Pin); // get raw data from servo potentiometer
     }
     result = constrain(mean / 10,  minFdBk,maxFdBk ); // average useful readings
-    Serial.println("fdBk: " + String(result));
     return (result);
 }
 
 
 // get position of the motor without attaching useful 
-// in rare scenario;
-long int motorObj::getPosWoAttaching(int motor_n)
+// in rare scenario, get in terms of angle between 0- 180
+int motorObj::getPosWoAttaching(int motor_n)
 {
     //make use of feedback function from 
     int fdbk = getFeedback(rPin[motor_n]);
+    if(DEBUG) Serial.printf("fdbk[%d]:%d\n ",motor_n, fdbk);
     return round(map( fdbk, maxFdBk, minFdBk, SERVO_MIN_ANGLE,SERVO_MAX_ANGLE));
 }
 
@@ -391,52 +389,56 @@ bool motorObj::isAttached(int Pin)
     return ((ch != 255) && (ch != 253));
 }
 
-long int motorObj::getPosition(int motor_n)
+// get position of the motor in terms of angle
+int motorObj::getPosition(int motor_n)
 {
-    bool attachedHere=false;
-    if (!isAttached(sPin[motor_n])){
-        myservo->attachServo(sPin[motor_n],  minUs , maxUs);
-        delay(100);
-        attachedHere=true;
-    }
+    // bool attachedHere=false;
+    // if (!isAttached(sPin[motor_n])){
+    //     myservo->attachServo(sPin[motor_n],  minUs , maxUs);
+    //     delay(100);
+    //     attachedHere=true;
+    // }
 
     int h = getPosWoAttaching(motor_n) ;
-    if(DEBUG) Serial.printf("A_angle[%d]:%d\n ",motor_n, h);
-    myservo->read(sPin[motor_n]);
-    h = myservo->read(sPin[motor_n]); // get the position of the motor again
+    // myservo->read(sPin[motor_n]);
+    // h = myservo->read(sPin[motor_n]); // get the position of the motor again
     if ( direction [motor_n] == -1) h = maxOpenAngle - h + minOpenAngle;
 
-    Serial.printf("angle[%d]:%d\n",motor_n, h);
-    h = round(map(h, maxFdBk, minFdBk, SERVO_MIN_ANGLE, SERVO_MAX_ANGLE));
-    // if you attached it separately then detach it
-    if (attachedHere) {
-        myservo->detach(sPin[motor_n]);
-        delay(100);
-    }
 
+    if(DEBUG) Serial.printf("A_angle[%d]:%d\n ",motor_n, h);
+
+    // Serial.printf("angle[%d]:%d\n",motor_n, h);
+    // if you attached it separately then detach it
+    // if (attachedHere) {
+    //     myservo->detach(sPin[motor_n]);
+    //     delay(100);
+    // }
     return h;
 }
+
 
 void motorObj::setOpeningAngle(int angle)
 {
     // get the position of each to set them;
     // usually they all should be same;
     if(DEBUG) Serial.printf("Setting Max Opening Angle...");
-
-    if (angle == -1)
-    {
-        angle =0;
-        for (int k = 0; k < numServos; k++)
+    if (limitFlag!=3 && limitFlag!=2){ 
+        if (angle == -1)
         {
-            angle += getPosition(k); // get position of index motor
-            Serial.printf("\t[%d] = %d ", k,angle);
+            angle =0;
+            for (int k = 0; k < numServos; k++)
+            {
+                angle += getPosition(k); // get position of index motor
+                Serial.printf("\t[%d] = %d ", k,angle);
+            }
+            angle = angle/numServos;
+        
         }
-        angle = angle/numServos;
-      
+        Serial.printf("....AvgAngle=%d\n", angle);
+        maxOpenAngle = angle > SERVO_MAX_ANGLE ? SERVO_MAX_ANGLE : angle;
+        limitFlag +=2;
     }
-    Serial.printf("....AvgAngle=%d\n", angle);
-    maxOpenAngle = angle > SERVO_MAX_ANGLE ? SERVO_MAX_ANGLE : angle;
-    if (limitFlag!=3 && limitFlag!=2) limitFlag +=2;
+    openBlinds();
 }
 
 void motorObj::setClosingAngle(int angle)
@@ -444,21 +446,39 @@ void motorObj::setClosingAngle(int angle)
     // get the position of each to set them;
     // usually they all should be same;
     if(DEBUG) Serial.printf("Setting Min Opening Angle...");
-
-    if (angle == -1)
-    {
-        angle =0;
-        for (int k = 0; k < numServos; k++)
+    if (limitFlag!=3 && limitFlag!=1) {
+    
+        if (angle == -1)
         {
-            angle += getPosition(k); // get position of index motor
-            if(DEBUG) Serial.printf("\t[%d] = %d ", k,angle);
+            angle =0;
+            for (int k = 0; k < numServos; k++)
+            {
+                angle += getPosition(k); // get position of index motor
+                if(DEBUG) Serial.printf("\t[%d] = %d ", k,angle);
+            }
+            angle = angle/numServos;
+        
         }
-        angle = angle/numServos;
-      
-    }
-    if(DEBUG) Serial.printf("....AvgAngle=%d\n", angle);
-    minOpenAngle = angle < SERVO_MIN_ANGLE ? SERVO_MIN_ANGLE : angle;
-    if (limitFlag!=3 && limitFlag!=1) limitFlag +=1;
+        if(DEBUG) Serial.printf("....AvgAngle=%d\n", angle);
+        minOpenAngle = angle < SERVO_MIN_ANGLE ? SERVO_MIN_ANGLE : angle;
+        limitFlag +=1;
+    }    
+    closeBlinds();
+}
+
+bool motorObj::setLimits(int sliderpos){
+    if (sliderpos == -1) sliderpos = getPosition(0);
+    // get current position of the if the blind is in going from open -> close state
+    // set the max angle to the blinds to be opened
+    if(!isBlindOpen())
+        setOpeningAngle(sliderpos);
+    // get current position of the if the blind is in going from close -> open state
+    // set the min angle to the blinds to be closed
+    else if (isBlindOpen())
+        setClosingAngle(sliderpos);
+    else return false;
+
+    return true;
 }
 
 void motorObj::openOrCloseBlind()
@@ -527,6 +547,7 @@ long int motorObj::ifRunningHalt()
     return getPosition(0);
 }
 
+// Factory reset the blinds
 void motorObj::FactoryReset()
 {
     if (DEBUG)

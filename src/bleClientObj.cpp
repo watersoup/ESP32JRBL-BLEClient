@@ -224,28 +224,15 @@ void bleClientObj::processCommand(const String& command) {
         if (motor != nullptr) {
             motor->closeBlinds();
         }
-    } else if (command.startsWith("MAX/")) { // of limit setting
+    }  else if (command.startsWith("SETLIMIT/")) { // of limit setting
         int position = command.substring(5).toInt();
-        Serial.println("Setting position to: " + String(position) + "%");
-        // Add code to set blinds position
-        if (motor != nullptr) {
-            motor->setOpeningAngle(motor->getPositionOfMotor(position));
-        }
-
-    }  else if (command.startsWith("MIN/")) { // of limit setting
-        int position = command.substring(5).toInt();
-        Serial.println("Setting position to: " + String(position) + "%");
-        // Add code to set blinds position
-        if (motor != nullptr) {
-            motor->setOpeningAngle(motor->getPositionOfMotor(position));
-        }
+        motor->setLimits(position);
     } else if (command.startsWith("SP/")){ //slider moved
         int position = command.substring(4).toInt();
         Serial.println("Recd slider position: " + String(position) + "%");
         if (motor != nullptr){
             motor->moveBlinds(motor->getPositionOfMotor(position));
         }
-    
     }else {
         String newcommand = "N/A : " + command;
         writeStatus(newcommand);

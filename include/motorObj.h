@@ -45,7 +45,7 @@ class motorObj{
         // slider position        
         int sliderMin = 0;
         int sliderMax = 100;
-        int currentSliderPosition=-1;
+        int currentSliderPosition=-1; // between 0 - 100
 
         bool blindsOpen=false;
         long int updateTime;
@@ -89,12 +89,14 @@ class motorObj{
 
         bool isInitialized();
 
+        bool setLimits(int sliderpos=-1);
+
         void openOrCloseBlind();
         void openBlinds();
         void closeBlinds();
         int getFeedback(int);
-        long int getPosition(int);
-        long int getPosWoAttaching(int motor_n);
+        int getPosition(int);
+        int getPosWoAttaching(int motor_n);
 
         void cleanUpAfterSlowMove();
 
