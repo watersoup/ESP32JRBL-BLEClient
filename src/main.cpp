@@ -1,14 +1,17 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <bleClientObj.h>
-#include <BLEDevice.h>
+#include <WebServer.h>
 #include <WiFi.h>
+// #include <DNSServer.h>
+#ifndef ESPAsyncWiFiManager_h
 #include <ESPAsyncWebServer.h>
-#include <esp_mac.h>
+#endif
 #include <ESPAsyncWiFiManager.h>
+// #include <esp_mac.h>
 #include <ElegantOTA.h>
+#include <BLEDevice.h>
+#include <bleClientObj.h>
 #include <LittleFSsupport.h>
-#include "wifiData.h"
 #include "motorObj.h"
 
 // Undefine DEBUG if previously defined to avoid conflicts
@@ -33,7 +36,7 @@ DNSServer dnsServer;
 AsyncWebSocket ws("/ws");
 
 // Instantiate AsyncWiFiManager with server and DNS server
-AsyncWiFiManager *wifiManager = new AsyncWiFiManager(&server, &dnsServer);
+// AsyncWiFiManager *wifiManager = new AsyncWiFiManager(&server, &dnsServer);
 
 // Timing variables for OTA and WiFi operations
 unsigned long ota_progress_millis = 0;
@@ -105,28 +108,29 @@ bool isWifiOn()
   return false;
 }
 
-// Function to start WiFi connection
-void startWifi()
-{
-  WiFi.begin(SSID, PASS_WD); // Begin WiFi with provided SSID and password
-  Serial.println("");
 
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
+void connectToWifi() {
+
+  // go in loop till its not connected
+  while (WiFi.status() != WL_CONNECTED) {
+    //WiFiManager
+    //Local intialization. Once its business is done, there is no need to keep it around
+    AsyncWiFiManager wifiManager(&server,&dnsServer);
+
+
+    if (!wifiManager.startConfigPortal("BleClt-AP")) {
+      Serial.println("failed to connect and hit timeout");
+      delay(3000);
+      //reset and try again, or maybe put it to deep sleep
+      ESP.restart();
+      delay(5000);
+    }
+
+    //if you get here you have connected to the WiFi
+    Serial.println("connected...yeey :)");
+    Serial.println(WiFi.localIP());
   }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(SSID);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  
-  // Record the time when WiFi connection was established
-  wifiStartMillis = millis();
 }
-
 // Function to turn on WiFi
 bool turnOnWiFi()
 {
@@ -597,23 +601,29 @@ void setOTA()
 void setup()
 {
   pinMode(BUILTINPIN, OUTPUT); // Set built-in LED pin as output
-
-  blink(BUILTINPIN, 1, 1000); // Blink LED once with 1-second interval
-  bleInst = new bleClientObj(); // Create a new BLE client instance
+  blink(BUILTINPIN, 1, 200); // Blink LED twice with 200ms interval
 
   Serial.begin(115200); // Initialize serial communication at 115200 baud
 
+
   // Start WiFi connection
-  startWifi();
+  connectToWifi();
+
 
   // Initialize filesystem
   initFS();
   blink(BUILTINPIN, 2, 200); // Blink LED twice with 200ms interval
 
+
   // Serve static files from LittleFS
   server.serveStatic("/", LittleFS, "/");
+  // server.serveStatic("/setup.css", LittleFS, "/setup.css");
+  // server.serveStatic("/setup.js", LittleFS, "/setup.js");
   blink(BUILTINPIN, 2, 1000); // Blink LED twice with 1-second interval
 
+  blink(BUILTINPIN, 1, 1000); // Blink LED once with 1-second interval
+  bleInst = new bleClientObj(); // Create a new BLE client instance
+  
   // Set up the web server and WebSocket handlers
   serverSetup();
   blink(BUILTINPIN, 4, 200); // Blink LED four times with 200ms interval

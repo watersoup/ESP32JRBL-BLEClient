@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Blinds Initialization</title>
-    <link rel="stylesheet" href="style_setup.css">
+    <link rel="stylesheet" href="setup.css" >
 </head>
 <body>
     <div class="container">
@@ -28,13 +28,16 @@
     <div id="resetModal" class="modal">
         <div class="modal-content">
             <h2>Factory Reset</h2>
-            <label for="resetPassword">Enter reset password:</label>
-            <input type="password" id="resetPassword" required>
-            <button id="confirmReset">Confirm Reset</button>
+            <form id="resetForm">
+                <!-- <label for="resetUsername" class="hidden">Enter username:</label>
+                <input type="text" id="resetUsername" name="resetUsername" class="hidden" autocomplete="username"> -->
+                <label for="resetPassword">Enter reset password:</label>
+                <input type="password" id="resetPassword" autocomplete="new-password" required>
+                <button type="submit" id="confirmReset">Confirm Reset</button>
+            </form>
         </div>
     </div>
 
-    <script src="script_setup.js">
-</script>
+    <script src="setup.js"></script>
 </body>
 </html>
