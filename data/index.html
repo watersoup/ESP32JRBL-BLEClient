@@ -1,46 +1,121 @@
 <!DOCTYPE html>
-<html lang="en" >
-
-<head >
+<html lang="en">
+<head>
     <meta charset="UTF-8">
-    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blinds Control</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Blind Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
 
+        .container {
+            max-width: 90vw;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .blind-name {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .control-buttons {
+            margin-bottom: 20px;
+        }
+
+        button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .small-button {
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+
+        .slider-container {
+            width: 80vw; /* Use viewport width for flexibility */
+            max-width: 600px; /* Set a max width */
+            margin: 20px auto;
+            position: relative;
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .slider {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 10px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .slider:hover {
+            opacity: 1;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #9c2a2a;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            background: #9c2a2a;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+    </style>
 </head>
-
-<body >
-
-    <h1 id="controlTitle">Blinds-name</h1>
-
-    <div class="control-container">
-        <!-- Toggle Button Container -->
-        <div class="toggleButton-container">
-            <button id="toggleButton">Open</button>
+<body>
+    <div class="container">
+        <div class="blind-name" id="blindName">Loading...</div>
+        <div class="control-buttons">
+            <button id="toggleBtn" onclick="toggleBlind()">Open</button>
+            <br>
+            <button id="setupBtn" class="small-button" onclick="setupLimits()">Setup Limits</button>
         </div>
-
-        <!-- Momentary Button Container -->
-        <div class="momentaryButton-container">
-            <button id="momentaryButton">Set Window Limits</button>
-        </div>
-
-        <!-- Slider Container -->
         <div class="slider-container">
-            <!-- Vertical slider -->
-            <input type="range" min="0" max="100" value="0" id="openRangeSlider">
-            <!-- Slider labels -->
-            <div class="label-container">
-                <div class="labelopen">Open</div>
-                <div class="labelclose">Closed</div>
+            <div class="slider-labels">
+                <span>Up</span>
+                <span>Down</span>
             </div>
+            <input type="range" 
+                   id="blindSlider" 
+                   class="slider"
+                   min="0" 
+                   max="100" 
+                   value="0" 
+                   oninput="updateSlider(this.value)">
         </div>
     </div>
 
-    <!-- Bottom status message element -->
-    <div id="statusMessage"></div>
-
-    <script src="scriptnew.js"></script>
+    <script src="script.js"></script>
 </body>
-
 </html>
