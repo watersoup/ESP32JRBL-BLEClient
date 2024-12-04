@@ -2,34 +2,20 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <WiFi.h>
-<<<<<<< HEAD
-// #include <DNSServer.h>
-=======
->>>>>>> eea9db16f589e4b0c43107add1c5810f993b0445
 #ifndef ESPAsyncWiFiManager_h
 #include <ESPAsyncWebServer.h>
 #endif
 #include <ESPAsyncWiFiManager.h>
-// #include <esp_mac.h>
 #include <ElegantOTA.h>
 #include <BLEDevice.h>
 #include <bleClientObj.h>
 #include <LittleFSsupport.h>
 #include "motorObj.h"
-<<<<<<< HEAD
-
 // Undefine DEBUG if previously defined to avoid conflicts
 #ifdef DEBUG
 #undef DEBUG
 #endif
 
-=======
-// Undefine DEBUG if previously defined to avoid conflicts
-#ifdef DEBUG
-#undef DEBUG
-#endif
-
->>>>>>> eea9db16f589e4b0c43107add1c5810f993b0445
 // Define DEBUG and various timing constants
 #define DEBUG 1
 #define SHORT_PRESS_TIME 500      // Short press duration in milliseconds
@@ -201,11 +187,6 @@ void onOTAProgress(size_t current, size_t final)
   // Log every 1 second
   if (millis() - ota_progress_millis > 1000)
   {
-<<<<<<< HEAD
-=======
-  if (millis() - ota_progress_millis > 1000)
-  {
->>>>>>> eea9db16f589e4b0c43107add1c5810f993b0445
     ota_progress_millis = millis();
     Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
   }
@@ -329,7 +310,6 @@ void handleOnOffButtonPress()
   {
     pressedTime = millis(); // Record the time when button was pressed
     delay(100); // Debounce delay
-<<<<<<< HEAD
 
     // Check if Intensity button is also pressed
     if (digitalRead(intensityButton) == HIGH)
@@ -589,271 +569,6 @@ void initiate_buttons()
   digitalWrite(intensityButton, LOW);        // Ensure Intensity button is LOW
 }
 
-=======
-
-    // Check if Intensity button is also pressed
-    if (digitalRead(intensityButton) == HIGH)
-    {
-      handleBothButtonPush();
-      return;
-    }
-    Serial.println(" handleOnoffButtonPress..");
-
-    // Wait for button release
-    while (digitalRead(onOffButton) == HIGH)
-    {
-      delay(50);
-    }
-    pressDuration = millis() - pressedTime; // Calculate press duration
-
-    if (pressDuration >= SHORT_PRESS_TIME)
-    {
-      // Set the angle based on whether blinds are open or closed
-      if (!mymotor->isBlindOpen())
-      {
-        if(DEBUG) Serial.println(" *****Setting the max angles");
-        mymotor->setOpeningAngle();
-        mymotor->openBlinds();
-      }
-      else
-      {
-        if(DEBUG) Serial.println(" *****Setting the min angles");
-        mymotor->setClosingAngle();
-        mymotor->closeBlinds();
-      }
-    }
-    else
-    {
-      mymotor->openOrCloseBlind(); // Toggle the blinds
-    }
-    notifyServer(10); // Notify server with x=2
-  }
-}
-
-// Function to notify log messages to WebSocket clients
-void notifyLog(String message)
-{
-  ws.textAll("LOG :" + message);
-}
-
-// Function to handle incoming WebSocket messages
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
-{
-  AwsFrameInfo *info = (AwsFrameInfo *)arg; // Cast the argument to AwsFrameInfo
-  String jsonResponse;
-  String paramName;
-  int i;
-
-  // Check if the message is a complete final text frame
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
-  {
-    JsonDocument doc;
-    deserializeJson(doc, data); // Deserialize the incoming JSON data
-    String jsonString;
-    serializeJson(doc, jsonString); // Serialize it back to string for debugging
-    String action = doc["action"];  // Extract the action field
-
-    if (action == "OPEN")
-    {
-      mymotor->openBlinds(); // Open the blinds
-      notifyServer(10);       // Notify server with x=3
-    }
-    else if (action == "CLOSE")
-    {
-      mymotor->closeBlinds(); // Close the blinds
-      notifyServer(10);        // Notify server with x=4
-    }else if (action == "setupLimits"){
-      if(mymotor->setLimits())
-        notifyServer(10); // Notify server with x=5
-    }
-    else if (action == "getStatus")
-    {
-      JsonDocument response;
-      response["action"] = "status";
-      response["initialized"] = isInitialized;
-
-      if (isInitialized)
-      {
-        // If initialized, include blinds name and servo count
-        response["blindsName"] = mymotor->getBlindName();
-        response["servoCount"] = mymotor->getServoCount();
-        response["limitFlag"] = mymotor->getLimitFlag();
-        response["status"] = (mymotor->isBlindOpen()?1:0);
-        response["sliderPosition"] = mymotor->getCurrentSliderPosition();
-        // Create a JSON array for servo directions
-        JsonArray servos = response["Direction"].to<JsonArray>();
-        int *dirInt = mymotor->getDirections();
-        String dir = "";
-
-        for (i = 0; i < mymotor->getServoCount(); i++)
-        {
-          // Convert direction integers to strings
-          dir = (dirInt[i] == 1 ? "Right" : "Left");
-          servos.add(dir);
-        }
-      }
-
-      serializeJson(response, jsonResponse); // Serialize the response
-      if (DEBUG)
-        Serial.println(" getStatus : " + jsonResponse);
-
-      ws.textAll(jsonResponse); // Send the response to all WebSocket clients
-    }
-    else if (action == "submit")
-    {
-      int *dirVec;
-      JsonDocument response;
-      JsonObject data = doc["data"];
-
-      if (DEBUG)
-      {
-        Serial.println(" Submit :" + jsonString);
-      }
-
-      int counts = data["servoCount"].as<int>(); // Get the number of servos
-      dirVec = new int[counts];                   // Allocate memory for direction vector
-
-      if (!isInitialized)
-      {
-        // Retrieve servo positions from the submitted data
-        for (int i = 0; i < counts; i++)
-        {
-          paramName = "servo" + String(i + 1) + "Position";
-          // Assign direction based on position ("left" or "right")
-          dirVec[i] = data[paramName].as<String>() == "left" ? -1 : 1;
-          Serial.printf("dirVec[%d] = %s - %d\n", i, data[paramName].as<String>(), dirVec[i]);
-        }
-
-        // If mymotor exists, delete the old instance
-        if (mymotor != nullptr)
-        {
-          delete mymotor;
-          mymotor = nullptr;
-        }
-
-        // Create a new motor object with the specified number of servos and directions
-        mymotor = new motorObj(counts, dirVec);
-        Serial.println("Submit: Created Motor object ");
-
-        // Set the name of the blinds
-        mymotor->setBlindName(data["blindsName"].as<String>());
-
-        // Attach the motor to the BLE object for communication
-        Serial.println(" Attaching motor...");
-        bleInst->setMotor(mymotor);
-
-        Serial.println("Submit: done...");
-        delete[] dirVec; // Free allocated memory
-      }
-      else
-      {
-        // If already initialized, send an error response
-        response["action"] = "submitResponse";
-        response["message"] = "PreInitialized, if you want to change use factoryReset button";
-        serializeJson(response, jsonResponse); // Serialize the response
-        ws.textAll(jsonResponse);               // Send the response
-        return;                                 // Exit the function
-      }
-
-      isInitialized = true; // Mark as initialized
-
-      // Send a success response
-      response["action"] = "submitResponse";
-      response["message"] = "Configuration updated successfully";
-      serializeJson(response, jsonResponse);
-      ws.textAll(jsonResponse);
-
-      if (DEBUG)
-        Serial.println(" submit : done..");
-    }
-    else if (action == "factoryReset")
-    {
-      String password = doc["password"]; // Get the password from the request
-      if (password == "XYZ123")          // Verify the password
-      {
-        // Perform reset operations
-        isInitialized = false;
-        mymotor->FactoryReset(); // Factory reset the motor
-
-        // Clear EEPROM or flash memory here (implementation depends on motorObj)
-
-        // Send a success response
-        JsonDocument response;
-        response["action"] = "factoryResetResponse";
-        response["message"] = "Factory reset completed successfully";
-        String jsonResponse;
-        serializeJson(response, jsonResponse);
-        ws.textAll(jsonResponse);
-
-        isInitialized = false; // Ensure initialized flag is reset
-        ESP.restart();         // Restart the ESP32
-      }
-      else
-      {
-        // Send an error response for incorrect password
-        JsonDocument response;
-        response["action"] = "factoryResetResponse";
-        response["message"] = "Incorrect password";
-        String jsonResponse;
-        serializeJson(response, jsonResponse);
-        ws.textAll(jsonResponse);
-      }
-    }
-  }
-}
-
-// WebSocket event handler
-void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
-{
-  if (type == WS_EVT_CONNECT)
-  {
-    // New WebSocket client connected
-    if (DEBUG)
-      Serial.println("WebSocket client connected");
-    if (DEBUG)
-      Serial.println("WebSocket client connected");
-    client->text("LOG : WebSocket client connected !!! NEW " + String(ws.count()));
-  }
-  else if (type == WS_EVT_DISCONNECT)
-  {
-  }
-  else if (type == WS_EVT_DISCONNECT)
-  {
-    // WebSocket client disconnected
-    if (DEBUG)
-      Serial.println("WebSocket client disconnected");
-    notifyError(client, "WebSocket client disconnected :" + String(ws.count()));
-  }
-  else if (type == WS_EVT_DATA)
-  {
-    handleWebSocketMessage(arg, data, len); // Handle incoming WebSocket data
-  }
-}
-
-// Function to set up the web server and WebSocket handlers
-void serverSetup()
-{
-  // Add WebSocket handler to the server
-  server.addHandler(&ws);
-  ws.onEvent(onWsEvent);
-  // Route for serving the HTML page
-  server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(LittleFS, "/setup.html", "text/html"); });
-  // Route for serving the HTML page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(LittleFS, "/index.html", "text/html"); });
-}
-
-// Function to initialize button pins
-void initiate_buttons()
-{
-  pinMode(onOffButton, INPUT_PULLDOWN);      // Set On/Off button as input with pull-down resistor
-  pinMode(intensityButton, INPUT_PULLDOWN);  // Set Intensity button as input with pull-down resistor
-  digitalWrite(onOffButton, LOW);            // Ensure On/Off button is LOW
-  digitalWrite(intensityButton, LOW);        // Ensure Intensity button is LOW
-}
-
->>>>>>> eea9db16f589e4b0c43107add1c5810f993b0445
 // Function called when OTA update ends
 void onOTAEnd(bool success)
 {

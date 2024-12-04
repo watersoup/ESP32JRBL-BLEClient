@@ -39,10 +39,6 @@ void bleClientObj::configSecurity(){
     pSecurity->setStaticPIN(123456); // Set your static PIN here
     BLEDevice::setSecurityCallbacks(new MySecurity());
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> eea9db16f589e4b0c43107add1c5810f993b0445
 
 // start the ble should be called when we are ready 
 void bleClientObj::scan(){
@@ -288,8 +284,4 @@ void bleClientObj::notifyBLEServer(int x)
         msg = "sliderPosition :" + String(pos);
         writeStatus(msg);
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> eea9db16f589e4b0c43107add1c5810f993b0445
