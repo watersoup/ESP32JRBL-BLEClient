@@ -30,6 +30,7 @@ void initFS() {
   }
   else{
    Serial.println("LittleFS mounted successfully");
+
   }
 }
 

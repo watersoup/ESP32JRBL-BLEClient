@@ -3,41 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Blinds Initialization</title>
+    <title>Blind Control</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-            box-sizing: border-box;
-        }
-        .container {
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #333;
+            font-family: Arial, sans-serif;
             text-align: center;
-            margin-bottom: 30px;
+            margin: 0;
+            padding: 0;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-        }
-        input, select {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 20px;
+
+        .container {
+            max-width: 90vw;
+            margin: 20px auto;
+            padding: 20px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
+        .blind-name {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .control-buttons {
+            margin-bottom: 20px;
+        }
+
         button {
             display: inline-block;
             padding: 10px 20px;
@@ -48,85 +40,82 @@
             font-size: 16px;
             transition: background-color 0.3s;
         }
-        button[type="submit"] {
-            background-color: #4CAF50;
-            color: white;
+
+        .small-button {
+            padding: 5px 10px;
+            font-size: 14px;
         }
-        button[type="submit"]:hover {
-            background-color: #45a049;
+
+        .slider-container {
+            width: 80vw; /* Use viewport width for flexibility */
+            max-width: 600px; /* Set a max width */
+            margin: 20px auto;
+            position: relative;
         }
-        #factoryReset {
-            float: right;
-            background-color: #f44336;
-            color: white;
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
         }
-        #factoryReset:hover {
-            background-color: #d32f2f;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
+
+        .slider {
             width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
+            -webkit-appearance: none;
+            appearance: none;
+            height: 10px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
         }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 300px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+        .slider:hover {
+            opacity: 1;
         }
-        #confirmReset {
-            background-color: #2196F3;
-            color: white;
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            background: #9c2a2a;
+            cursor: pointer;
+            border-radius: 50%;
         }
-        #confirmReset:hover {
-            background-color: #1976D2;
-        }
-        #statusMessage {
-            text-align: center;
-            font-weight: bold;
-            margin-bottom: 20px;
+
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            background: #9c2a2a;
+            cursor: pointer;
+            border-radius: 50%;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>ESP32 Blinds Initialization</h1>
-        <div id="statusMessage"></div>
-        <form id="blindsForm">
-            <label for="blindsName">Name of the blinds:</label>
-            <input type="text" id="blindsName" name="blindsName" required>
-
-            <label for="servoCount">Number of servos (max 4):</label>
-            <input type="number" id="servoCount" name="servoCount" min="1" max="4" required>
-
-            <div id="servoPositions"></div>
-
-            <button type="submit">Submit</button>
-        </form>
-
-        <button id="factoryReset">Factory Reset</button>
-    </div>
-
-    <div id="resetModal" class="modal">
-        <div class="modal-content">
-            <h2>Factory Reset</h2>
-            <label for="resetPassword">Enter reset password:</label>
-            <input type="password" id="resetPassword" required>
-            <button id="confirmReset">Confirm Reset</button>
+        <div class="blind-name" id="blindName">Loading...</div>
+        <div class="control-buttons">
+            <button id="toggleBtn" onclick="toggleBlind()">Open</button>
+            <br>
+            <button id="setupBtn" class="small-button" onclick="setupLimits()">Setup Limits</button>
+        </div>
+        <div class="slider-container">
+            <div class="slider-labels">
+                <span>Up</span>
+                <span>Down</span>
+            </div>
+            <input type="range" 
+                   id="blindSlider" 
+                   class="slider"
+                   min="0" 
+                   max="100" 
+                   value="0" 
+                   oninput="updateSlider(this.value)">
         </div>
     </div>
 
-    <script src="scriptnew.js">
-</script>
+    <script src="script.js"></script>
 </body>
 </html>

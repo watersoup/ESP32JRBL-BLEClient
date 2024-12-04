@@ -1,7 +1,10 @@
 #ifndef MOTOR_OBJ_H
 #define MOTOR_OBJ_H
 #include <pwmWrite.h>
-#define EEPROM_ADDRESS 0
+#include "EEPROM.h"
+#include <Preferences.h>
+
+#define EEPROM_ADDRESS 0x00
 #ifndef DEBUG
 #define DEBUG 1
 #endif
@@ -12,13 +15,15 @@
 class motorObj{
 
     private:
-
-        const int numServos;
+        // servo parameters
+        const int spinlist[4] = {10, 9, 7, 6};
+        const int rpinlist[4] = {0, 1, 2, 3}; //analogpins
+        int numServos;
         // servo Pins they are all standard
-        int *sPin ;
+        int *sPin =nullptr;
         // readPins
-        int *rPin ; 
-        int *direction;
+        int *rPin =nullptr; 
+        int *direction = nullptr;
         // current angle 
         int currentAngle = 0 ; // completely cosed is what you start with.
 
@@ -26,34 +31,38 @@ class motorObj{
         bool savedFlag = false;
 
         float feedback;
-        Pwm *myservo;
+        Pwm *myservo = nullptr;
         bool servoAttached=false;
         double reading[20];
+        bool Initialized = false;
+
+        Preferences MYPrefs;
         
-        // kind of semi permanent angles;
-        int highestPosition = SERVO_MAX_ANGLE;
-        int lowestPosition = SERVO_MIN_ANGLE;
-        
-        // temporary max and min angles;
+        // semi permanant max and min angles;
         int maxOpenAngle = SERVO_MAX_ANGLE;
         int minOpenAngle = SERVO_MIN_ANGLE;
 
-        // slider position
-        int currentSliderPosition;
-        const int sliderMin = 0;
-        const int sliderMax = 100;
+        // slider position        
+        int sliderMin = 0;
+        int sliderMax = 100;
+        int currentSliderPosition=-1; // between 0 - 100
 
         bool blindsOpen=false;
         long int updateTime;
         int  limitFlag; // 0 none set, 1 lowerlimit Set, 2 upperlimit set 3 - both limits set
-        String blindName ;
+        String blindName="";
 
-        // memory size 
+        // memory size = 
         const int totalEEPROMSize = 10*sizeof(int)+ 10*sizeof(char);
 
         void initializePins(int numMotors);
         void setDirections(int * dirs);
         void initializeServo();
+        // check if the motor with spin is attached;
+        bool isAttached(int Pin);
+
+        // sticky flag for servos's get_pos values using read
+        bool readFlag = false;
 
     public:
         String status; // indicator of "open" or "close"
@@ -62,50 +71,59 @@ class motorObj{
 
         motorObj(int numMotors);
 
-        motorObj(int numMotors, int* dir);
+        motorObj(int numMotors, int * dirs);
 
         ~motorObj();
 
 
-        void slowOpen();
+
         void attachAll();
         void detachAll();
+        void slowMove();
         bool isOpen();
         bool isBlindOpen();
         // angle to which to open the motor to.
         void setOpeningAngle(int angle=-1);
-        void setBlindName(String name);
+        void setClosingAngle(int angle = -1);
+        void setBlindName(const String &name);
+
+        bool isInitialized();
+
+        bool setLimits(int sliderpos=-1);
 
         void openOrCloseBlind();
+        void openBlinds();
+        void closeBlinds();
         int getFeedback(int);
-        long int getPosition(int);
-        void cleanUpAfterSlowOpen();
+        int getPosition(int);
+        int getPosWoAttaching(int motor_n);
+
+        void cleanUpAfterSlowMove();
 
         // get position of the slider converted to motor position
         int getPositionOfMotor(int sliderPos=-1);
         // get (current) position of motor translate to slider
         int getPositionOfSlider(int angle=-1);
+        // return the stored values;
+        int getCurrentSliderPosition();
 
         int getLimitFlag();
 
         String getBlindName();
 
+        int getAvgFeedback(int Pin);
+
         int getServoCount();
 
-        void openBlinds();
-        void closeBlinds();
+        int *getDirections();
         long int ifRunningHalt();
 
-        int setWindowMax(int pos);  // does nothing
-        int setWindowLow(int pos);  // does nothing
-
         void FactoryReset();
-        void setSide(int direction, int index=0);
         void moveBlinds(int angle);
 
         void saveMotorParameters();  // save parameter of the various motors to the EEPROM
         void loadMotorParameters();
-        bool isEEPROMRangeEmpty(int startAddress, int endAddress);
+        bool isEEPROMRangeEmpty();
 };
 
 #endif
