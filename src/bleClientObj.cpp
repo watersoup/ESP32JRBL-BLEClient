@@ -40,6 +40,7 @@ void bleClientObj::configSecurity(){
     BLEDevice::setSecurityCallbacks(new MySecurity());
 }
 
+
 // start the ble should be called when we are ready 
 void bleClientObj::scan(){
     /* Retrieve a Scanner and set the callback we want to use to be informed when we

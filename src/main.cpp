@@ -2,7 +2,6 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <WiFi.h>
-// #include <DNSServer.h>
 #ifndef ESPAsyncWiFiManager_h
 #include <ESPAsyncWebServer.h>
 #endif
@@ -13,7 +12,6 @@
 #include <bleClientObj.h>
 #include <LittleFSsupport.h>
 #include "motorObj.h"
-
 // Undefine DEBUG if previously defined to avoid conflicts
 #ifdef DEBUG
 #undef DEBUG
@@ -188,6 +186,8 @@ void onOTAStart()
 void onOTAProgress(size_t current, size_t final)
 {
   // Log every 1 second
+  if (millis() - ota_progress_millis > 1000)
+  {
   if (millis() - ota_progress_millis > 1000)
   {
     ota_progress_millis = millis();
@@ -533,7 +533,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     // New WebSocket client connected
     if (DEBUG)
       Serial.println("WebSocket client connected");
+    if (DEBUG)
+      Serial.println("WebSocket client connected");
     client->text("LOG : WebSocket client connected !!! NEW " + String(ws.count()));
+  }
+  else if (type == WS_EVT_DISCONNECT)
+  {
   }
   else if (type == WS_EVT_DISCONNECT)
   {
@@ -554,7 +559,6 @@ void serverSetup()
   // Add WebSocket handler to the server
   server.addHandler(&ws);
   ws.onEvent(onWsEvent);
-
   // Route for serving the HTML page
   server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(LittleFS, "/setup.html", "text/html"); });
